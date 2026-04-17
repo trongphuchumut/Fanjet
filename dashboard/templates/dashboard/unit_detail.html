@@ -1,0 +1,450 @@
+{% extends "dashboard/base.html" %}
+{% load auth_extras %}
+{% block title %}{{ unit.name }}{% endblock %}
+{% block page_title %}{{ unit.name }} ({{ unit.unit_id }}){% endblock %}
+
+{% block extra_head %}
+<style>
+  .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  @media(max-width:800px){ .detail-grid{ grid-template-columns:1fr; } }
+  .d-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .d-head { padding:14px 18px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12);
+            display:flex; align-items:center; gap:10px; }
+  .d-icon { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .d-icon svg { width:14px; height:14px; stroke:#fff; fill:none; stroke-width:2; }
+  .d-title { font-size:13.5px; font-weight:700; }
+  .d-sub   { font-size:11.5px; color:var(--txt-2); margin-top:1px; }
+  .d-body  { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+
+  /* Status row */
+  .stat-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); }
+  .stat-row:last-child { border-bottom:none; }
+  .stat-lbl { font-size:12px; color:var(--txt-2); font-weight:600; }
+  .stat-val { font-size:13.5px; font-weight:700; }
+
+  /* CO-Speed Profile */
+  .profile-table { width:100%; border-collapse:collapse; }
+  .profile-table th { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+                       color:var(--txt-3); padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
+  .profile-table td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.04); }
+  .profile-table tr:last-child td { border-bottom:none; }
+  .pt-input { width:80px; height:34px; padding:0 8px; background:var(--bg); border:1px solid var(--border-strong);
+              border-radius:7px; color:var(--txt); font-family:'JetBrains Mono',monospace; font-size:13px;
+              outline:none; transition:border-color .15s; }
+  .pt-input:focus { border-color:var(--cyan); }
+  .del-pt { width:28px; height:28px; border-radius:6px; border:none; background:rgba(248,113,113,.1);
+            color:var(--red); cursor:pointer; font-size:16px; display:flex; align-items:center;
+            justify-content:center; transition:background .15s; }
+  .del-pt:hover { background:rgba(248,113,113,.2); }
+
+  /* SVG Chart */
+  #profile-svg { width:100%; height:180px; background:var(--bg-raised); border-radius:10px;
+                 display:block; overflow:visible; }
+  .chart-line { stroke:var(--cyan); stroke-width:2; fill:none; }
+  .chart-area { fill:rgba(56,189,248,.08); }
+  .chart-dot  { fill:var(--cyan); }
+  .chart-grid { stroke:rgba(255,255,255,.05); stroke-width:1; }
+  .chart-axis { stroke:rgba(255,255,255,.12); stroke-width:1; }
+  .chart-lbl  { font-size:10px; fill:var(--txt-3); font-family:'JetBrains Mono',monospace; }
+
+  /* Manual control */
+  .spd-slider { width:100%; -webkit-appearance:none; height:6px; border-radius:99px;
+                background:rgba(255,255,255,.1); outline:none; cursor:pointer; }
+  .spd-slider::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px;
+    border-radius:50%; background:var(--cyan); cursor:pointer; box-shadow:0 0 0 4px var(--cyan-glow); }
+  .speed-val-big { font-size:36px; font-weight:900; letter-spacing:-1px; }
+
+  /* Buttons */
+  .btn-save { padding:8px 20px; border-radius:9px; border:none; background:linear-gradient(135deg,#0ea5e9,#0284c7);
+              color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+              box-shadow:0 2px 10px rgba(14,165,233,.28); transition:opacity .15s,transform .15s; }
+  .btn-save:hover { opacity:.88; transform:translateY(-1px); }
+  .btn-outline { padding:7px 14px; border-radius:9px; border:1px solid var(--border-strong);
+                 background:none; color:var(--txt-2); font-family:inherit; font-size:13px;
+                 font-weight:600; cursor:pointer; transition:background .15s; }
+  .btn-outline:hover { background:var(--bg-hover); color:var(--txt); }
+
+  .add-pt { display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--cyan);
+            font-size:12.5px; font-weight:600; border:none; background:none; font-family:inherit; padding:4px 0; }
+  .add-pt:hover { opacity:.8; }
+
+  .mode-toggle-row { display:flex; gap:6px; }
+  .mtbtn { flex:1; padding:8px; border-radius:8px; border:1px solid var(--border);
+           background:none; color:var(--txt-2); font-family:inherit; font-size:13px;
+           font-weight:700; cursor:pointer; transition:all .15s; }
+  .mtbtn.active { border-color:var(--cyan-dim); background:var(--bg-active); color:var(--txt-active); }
+
+  .full-col { grid-column:1/-1; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Action bar -->
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+  <a href="{% url 'dashboard:units' %}" style="color:var(--txt-3);text-decoration:none;font-size:13px">← Danh sách</a>
+  <span style="color:var(--txt-3)">/</span>
+  <span style="font-size:13px;color:var(--txt-2)">{{ unit.name }}</span>
+  {% if request.user|has_role:'Admin' %}
+  <a href="{% url 'dashboard:unit_edit' unit.unit_id %}"
+     style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid var(--border);
+            color:var(--txt-2);font-size:12.5px;font-weight:600;text-decoration:none;
+            transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+    Sửa thông tin
+  </a>
+  {% endif %}
+</div>
+
+<div class="detail-grid">
+
+  <!-- Left col: Status + Control -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <!-- Current status -->
+    <div class="d-card">
+      <div class="d-head">
+        <div class="d-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">
+          <svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div><div class="d-title">Trạng thái hiện tại</div><div class="d-sub" id="online-status">
+          {% if unit.is_online %}● Online{% else %}○ Offline{% endif %}
+        </div></div>
+      </div>
+      <div class="d-body">
+        <div class="stat-row">
+          <span class="stat-lbl">Nồng độ CO</span>
+          <span class="stat-val {% if co_status == 'alarm' %}" style="color:var(--red)"
+                               {% elif co_status == 'warning' %}">{% endif %}" id="detail-co">
+            {% if unit.last_co_ppm is not None %}{{ unit.last_co_ppm|floatformat:1 }} ppm{% else %}Chưa có dữ liệu{% endif %}
+          </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">Tốc độ quạt</span>
+          <span class="stat-val" id="detail-speed">{{ unit.last_speed_pct|default:"—" }}{% if unit.last_speed_pct is not None %}%{% endif %}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">Chế độ</span>
+          <span class="stat-val" id="detail-mode">{{ unit.get_control_mode_display }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">Trạng thái</span>
+          <span class="stat-val" id="detail-trip">
+            {% if unit.last_tripped %}<span style="color:var(--red)">⚠ TRIP</span>{% else %}<span style="color:var(--green)">✓ Bình thường</span>{% endif %}
+          </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">Ngưỡng CO warn/alarm</span>
+          <span class="stat-val" style="color:var(--txt-2);font-size:12.5px">
+            <span style="color:var(--amber)">{{ unit.co_warn_ppm }}</span> / <span style="color:var(--red)">{{ unit.co_alarm_ppm }}</span> ppm
+          </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">MQTT Topic</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--txt-2)">{{ unit.get_topic_base }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Control panel -->
+    {% if request.user|has_role:'Admin,Operator' %}
+    <div class="d-card">
+      <div class="d-head">
+        <div class="d-icon" style="background:linear-gradient(135deg,#7c3aed,#6366f1)">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+        </div>
+        <div><div class="d-title">Điều khiển</div><div class="d-sub">Gửi lệnh MQTT đến bộ quạt</div></div>
+      </div>
+      <div class="d-body">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-2);margin-bottom:8px">Chế độ điều khiển</div>
+          <div class="mode-toggle-row">
+            <button class="mtbtn {% if unit.control_mode == 'auto' %}active{% endif %}" id="ctrl-auto" onclick="ctrlSetMode('auto')">⚡ AUTO</button>
+            <button class="mtbtn {% if unit.control_mode == 'manual' %}active{% endif %}" id="ctrl-manual" onclick="ctrlSetMode('manual')">🎛 MANUAL</button>
+          </div>
+        </div>
+        <div id="manual-ctrl" {% if unit.control_mode != 'manual' %}style="display:none"{% endif %}>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-2);margin-bottom:10px">Tốc độ (0 = Tắt, 20-100%)</div>
+          <div style="text-align:center;margin-bottom:10px">
+            <span class="speed-val-big" id="ctrl-spd-display">{{ unit.manual_speed }}</span>
+            <span style="font-size:16px;color:var(--txt-2);font-weight:600">%</span>
+          </div>
+          <input type="range" class="spd-slider" id="ctrl-slider"
+                 min="0" max="100" step="1" value="{{ unit.manual_speed }}"
+                 oninput="onSlide(this.value)" />
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt-3);margin-top:4px">
+            <span>OFF (0%)</span><span>20%</span><span>50%</span><span>100%</span>
+          </div>
+        </div>
+        <button class="btn-save" id="ctrl-send" onclick="ctrlSend()" style="width:100%">
+          Gửi lệnh MQTT ↗
+        </button>
+        <div id="ctrl-feedback" style="font-size:12px;text-align:center;height:16px"></div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right col: CO-Speed Profile -->
+  <div class="d-card">
+    <div class="d-head">
+      <div class="d-icon" style="background:linear-gradient(135deg,#0f766e,#0d9488)">
+        <svg viewBox="0 0 24 24"><polyline points="3,17 9,11 13,15 21,7"/><polyline points="14,7 21,7 21,14"/></svg>
+      </div>
+      <div>
+        <div class="d-title">Biểu đồ tương quan CO → Tốc độ</div>
+        <div class="d-sub">Định nghĩa quy tắc tự động</div>
+      </div>
+    </div>
+    <div class="d-body">
+
+      <!-- Chart preview -->
+      <svg id="profile-svg" viewBox="0 0 360 160" aria-label="Biểu đồ CO-Speed">
+        <g id="svg-grid"></g>
+        <g id="svg-area"></g>
+        <g id="svg-line"></g>
+        <g id="svg-dots"></g>
+        <g id="svg-labels"></g>
+      </svg>
+
+      <!-- Points table -->
+      <div style="overflow-x:auto">
+        <table class="profile-table">
+          <thead>
+            <tr>
+              <th>CO (ppm)</th>
+              <th>Tốc độ (%)<br><span style="font-weight:400;text-transform:none;letter-spacing:0">0=Tắt, 20-100</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="profile-tbody">
+            {% for p in profile_points %}
+            <tr>
+              <td><input type="number" class="pt-input co-inp" value="{{ p.co_ppm }}" min="0" step="1" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              <td><input type="number" class="pt-input spd-inp" value="{{ p.speed_pct }}" min="0" max="100" step="1" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              {% if request.user|has_role:'Admin' %}<td><button class="del-pt" onclick="delRow(this)" title="Xóa điểm">×</button></td>{% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td><input type="number" class="pt-input co-inp" value="0" min="0" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              <td><input type="number" class="pt-input spd-inp" value="0" min="0" max="100" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              {% if request.user|has_role:'Admin' %}<td><button class="del-pt" onclick="delRow(this)">×</button></td>{% endif %}
+            </tr>
+            <tr>
+              <td><input type="number" class="pt-input co-inp" value="{{ unit.co_warn_ppm|floatformat:0 }}" min="0" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              <td><input type="number" class="pt-input spd-inp" value="30" min="0" max="100" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              {% if request.user|has_role:'Admin' %}<td><button class="del-pt" onclick="delRow(this)">×</button></td>{% endif %}
+            </tr>
+            <tr>
+              <td><input type="number" class="pt-input co-inp" value="{{ unit.co_alarm_ppm|floatformat:0 }}" min="0" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              <td><input type="number" class="pt-input spd-inp" value="80" min="0" max="100" oninput="drawChart()" {% if not request.user|has_role:'Admin' %}readonly{% endif %} /></td>
+              {% if request.user|has_role:'Admin' %}<td><button class="del-pt" onclick="delRow(this)">×</button></td>{% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if request.user|has_role:'Admin' %}
+      <button class="add-pt" onclick="addRow()">
+        <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Thêm điểm
+      </button>
+
+      <div style="display:flex;gap:10px">
+        <button class="btn-save" id="btn-profile-save" onclick="saveProfile()" style="flex:1">
+          Lưu biểu đồ
+        </button>
+        <div id="profile-feedback" style="font-size:12px;color:var(--txt-2);align-self:center"></div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Recent telemetry (full width) -->
+{% if recent %}
+<div class="d-card full-col" style="margin-top:16px">
+  <div class="d-head">
+    <div class="d-icon" style="background:linear-gradient(135deg,#475569,#334155)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+    </div>
+    <div><div class="d-title">Lịch sử gần nhất</div><div class="d-sub">{{ recent|length }} bản ghi mới nhất</div></div>
+  </div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead>
+        <tr>
+          {% for h in "Thời gian,Nồng độ CO,Tốc độ,Trạng thái,Chế độ" %}
+          {% endfor %}
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Thời gian</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">CO (ppm)</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Tốc độ</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Trạng thái</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Chế độ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in recent %}
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+          <td style="padding:8px 14px;font-family:'JetBrains Mono',monospace;color:var(--txt-2)">{{ t.timestamp|date:"d/m H:i:s" }}</td>
+          <td style="padding:8px 14px;font-family:'JetBrains Mono',monospace;font-weight:600">{{ t.co_ppm|floatformat:1 }}</td>
+          <td style="padding:8px 14px;font-family:'JetBrains Mono',monospace">{{ t.speed_pct }}%</td>
+          <td style="padding:8px 14px">{% if t.is_tripped %}<span style="color:var(--red);font-weight:700">TRIP</span>{% else %}<span style="color:var(--green)">OK</span>{% endif %}</td>
+          <td style="padding:8px 14px;text-transform:uppercase;font-size:11px;font-weight:700;color:var(--txt-3)">{{ t.mode }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+var UNIT_ID = '{{ unit.unit_id }}';
+var CO_WARN = {{ unit.co_warn_ppm }};
+var CO_ALARM = {{ unit.co_alarm_ppm }};
+var ctrlMode = '{{ unit.control_mode }}';
+
+// ── CO-Speed chart ───────────────────────────────────
+function getPoints() {
+  var rows = document.querySelectorAll('#profile-tbody tr');
+  var pts = [];
+  rows.forEach(function(r){
+    var co  = parseFloat(r.querySelector('.co-inp').value||0);
+    var spd = parseFloat(r.querySelector('.spd-inp').value||0);
+    if(!isNaN(co)&&!isNaN(spd)) pts.push({co:co, spd:spd});
+  });
+  return pts.sort(function(a,b){return a.co-b.co;});
+}
+
+function drawChart() {
+  var pts = getPoints();
+  var svg    = document.getElementById('profile-svg');
+  var W=360, H=160, padL=32, padR=12, padT=12, padB=28;
+  var cW = W-padL-padR, cH = H-padT-padB;
+
+  var maxCO = Math.max.apply(null, pts.map(function(p){return p.co;}));
+  maxCO = Math.max(maxCO, CO_ALARM, 100);
+
+  function sx(co){ return padL + (co/maxCO)*cW; }
+  function sy(spd){ return padT + (1-spd/100)*cH; }
+
+  // Grid
+  var grid = '';
+  for(var i=0;i<=4;i++){
+    var yy = padT + (i/4)*cH;
+    grid += '<line class="chart-grid" x1="'+padL+'" y1="'+yy+'" x2="'+(W-padR)+'" y2="'+yy+'"/>';
+    grid += '<text class="chart-lbl" x="'+(padL-4)+'" y="'+(yy+4)+'" text-anchor="end">'+(100-i*25)+'</text>';
+  }
+  // X axis labels
+  var xStep = Math.ceil(maxCO/4);
+  for(var j=0;j<=4;j++){
+    var xv = j * xStep;
+    var xx = sx(xv);
+    grid += '<line class="chart-axis" x1="'+xx+'" y1="'+padT+'" x2="'+xx+'" y2="'+(H-padB)+'"/>';
+    grid += '<text class="chart-lbl" x="'+xx+'" y="'+(H-padB+14)+'" text-anchor="middle">'+xv+'</text>';
+  }
+  // Threshold lines
+  grid += '<line stroke="rgba(251,191,36,.35)" stroke-width="1" stroke-dasharray="4,3" x1="'+sx(CO_WARN)+'" y1="'+padT+'" x2="'+sx(CO_WARN)+'" y2="'+(H-padB)+'"/>';
+  grid += '<line stroke="rgba(248,113,113,.35)" stroke-width="1" stroke-dasharray="4,3" x1="'+sx(CO_ALARM)+'" y1="'+padT+'" x2="'+sx(CO_ALARM)+'" y2="'+(H-padB)+'"/>';
+  document.getElementById('svg-grid').innerHTML = grid;
+
+  if(pts.length < 2){ document.getElementById('svg-line').innerHTML=''; document.getElementById('svg-area').innerHTML=''; document.getElementById('svg-dots').innerHTML=''; return; }
+
+  var path = pts.map(function(p,i){ return (i===0?'M':'L')+sx(p.co).toFixed(1)+','+sy(p.spd).toFixed(1); }).join(' ');
+  var area = path + ' L'+sx(pts[pts.length-1].co).toFixed(1)+','+(H-padB)+' L'+padL+','+(H-padB)+' Z';
+
+  document.getElementById('svg-area').innerHTML = '<path class="chart-area" d="'+area+'"/>';
+  document.getElementById('svg-line').innerHTML  = '<path class="chart-line" d="'+path+'"/>';
+  var dots = pts.map(function(p){ return '<circle class="chart-dot" cx="'+sx(p.co).toFixed(1)+'" cy="'+sy(p.spd).toFixed(1)+'" r="4"/>'; }).join('');
+  document.getElementById('svg-dots').innerHTML = dots;
+}
+
+function addRow() {
+  var tbody = document.getElementById('profile-tbody');
+  var row = document.createElement('tr');
+  row.innerHTML = '<td><input type="number" class="pt-input co-inp" value="0" min="0" oninput="drawChart()"/></td>'
+                 +'<td><input type="number" class="pt-input spd-inp" value="0" min="0" max="100" oninput="drawChart()"/></td>'
+                 +'<td><button class="del-pt" onclick="delRow(this)">×</button></td>';
+  tbody.appendChild(row);
+  drawChart();
+}
+
+function delRow(btn) {
+  var tbody = document.getElementById('profile-tbody');
+  if(tbody.rows.length <= 1) return;
+  btn.closest('tr').remove();
+  drawChart();
+}
+
+function saveProfile() {
+  var pts = getPoints();
+  var btn = document.getElementById('btn-profile-save');
+  var fb  = document.getElementById('profile-feedback');
+  btn.disabled = true; btn.textContent = 'Đang lưu…';
+  fetch('/dashboard/api/units/'+UNIT_ID+'/profile/', {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},
+    body: JSON.stringify(pts.map(function(p){ return {co_ppm:p.co, speed_pct:p.spd}; }))
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false;
+    btn.textContent = 'Lưu biểu đồ';
+    fb.textContent = d.ok ? '✓ Đã lưu & gửi MQTT' : '✗ Lỗi: '+d.error;
+    fb.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(function(){ fb.textContent=''; }, 3000);
+  });
+}
+
+// ── Manual control ───────────────────────────────────
+function onSlide(v) {
+  document.getElementById('ctrl-spd-display').textContent = v;
+}
+
+function ctrlSetMode(mode) {
+  ctrlMode = mode;
+  document.getElementById('ctrl-auto').classList.toggle('active', mode==='auto');
+  document.getElementById('ctrl-manual').classList.toggle('active', mode==='manual');
+  document.getElementById('manual-ctrl').style.display = mode==='manual' ? 'block' : 'none';
+}
+
+function ctrlSend() {
+  var speed = ctrlMode==='manual' ? parseInt(document.getElementById('ctrl-slider').value||0) : 0;
+  var btn = document.getElementById('ctrl-send');
+  var fb  = document.getElementById('ctrl-feedback');
+  btn.disabled = true; btn.textContent = 'Đang gửi…';
+  fetch('/dashboard/api/units/'+UNIT_ID+'/command/', {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},
+    body: JSON.stringify({mode:ctrlMode, speed:speed})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false; btn.textContent = 'Gửi lệnh MQTT ↗';
+    fb.textContent = d.ok ? '✓ Đã gửi ('+ctrlMode+', '+speed+'%)' : '✗ Lỗi: '+d.error;
+    fb.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(function(){ fb.textContent=''; }, 3000);
+  });
+}
+
+function getCsrf() { var m=document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)'); return m?m[2]:''; }
+
+// Init chart
+drawChart();
+
+// Polling status
+setInterval(function(){
+  fetch('/dashboard/api/telemetry/').then(function(r){return r.json();}).then(function(d){
+    var u = d.units.find(function(x){ return x.unit_id===UNIT_ID; });
+    if(!u) return;
+    document.getElementById('detail-co').textContent = u.co_ppm!==null ? parseFloat(u.co_ppm).toFixed(1)+' ppm' : '—';
+    document.getElementById('detail-speed').textContent = u.speed_pct!==null ? u.speed_pct+'%' : '—';
+    document.getElementById('detail-mode').textContent = u.mode==='auto' ? 'Tự động' : 'Thủ công';
+    var trip = document.getElementById('detail-trip');
+    trip.innerHTML = u.is_tripped ? '<span style="color:var(--red)">⚠ TRIP</span>' : '<span style="color:var(--green)">✓ Bình thường</span>';
+    document.getElementById('online-status').textContent = u.online ? '● Online' : '○ Offline';
+  });
+}, 5000);
+</script>
+{% endblock %}

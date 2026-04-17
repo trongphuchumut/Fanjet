@@ -1,0 +1,205 @@
+{% extends "dashboard/base.html" %}
+{% load auth_extras %}
+{% block title %}Cấu hình Broker{% endblock %}
+{% block page_title %}Cấu hình Mosquitto Broker{% endblock %}
+
+{% block extra_head %}
+<style>
+  .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  @media(max-width:900px){ .cfg-grid{ grid-template-columns:1fr; } }
+
+  .s-card  { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .s-head  { padding:14px 18px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12);
+             display:flex; align-items:center; gap:10px; }
+  .s-icon  { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .s-icon svg { width:14px; height:14px; stroke:#fff; fill:none; stroke-width:2; }
+  .s-body  { padding:18px; display:flex; flex-direction:column; gap:14px; }
+  .s-foot  { padding:12px 18px; border-top:1px solid var(--border); background:rgba(0,0,0,.1); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:520px){ .field-row{ grid-template-columns:1fr; } }
+  .field label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.45px; color:var(--txt-2); }
+  .field input, .field select, .field textarea {
+    background:var(--bg); border:1px solid var(--border-strong); border-radius:9px;
+    color:var(--txt); font-family:inherit; font-size:13.5px; outline:none; padding:0 12px; height:40px;
+    transition:border-color .15s,box-shadow .15s; width:100%; -webkit-appearance:none;
+  }
+  .field input:focus, .field select:focus { border-color:var(--cyan); box-shadow:0 0 0 3px var(--cyan-glow); }
+  .field input.mono { font-family:'JetBrains Mono',monospace; font-size:13px; }
+  .field-hint { font-size:11px; color:var(--txt-3); }
+
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .toggle-row:last-child { border-bottom:none; }
+  .ts { position:relative; width:40px; height:22px; flex-shrink:0; cursor:pointer; }
+  .ts input { opacity:0; width:0; height:0; }
+  .ts-sl { position:absolute; inset:0; border-radius:99px; background:rgba(255,255,255,.08); border:1px solid var(--border-strong); transition:all .18s; }
+  .ts-sl::before { content:''; position:absolute; left:3px; top:50%; transform:translateY(-50%); width:14px; height:14px; background:var(--txt-2); border-radius:50%; transition:all .18s; }
+  .ts input:checked + .ts-sl { background:rgba(56,189,248,.2); border-color:var(--cyan); }
+  .ts input:checked + .ts-sl::before { background:var(--cyan); transform:translateX(18px) translateY(-50%); }
+
+  .btn-save { padding:8px 20px; border-radius:9px; border:none; background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 2px 10px rgba(14,165,233,.25); transition:opacity .15s,transform .15s; }
+  .btn-save:hover { opacity:.88; transform:translateY(-1px); }
+  .btn-back { padding:8px 16px; border-radius:9px; border:1px solid var(--border-strong); background:none; color:var(--txt-2); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:background .15s; }
+  .btn-back:hover { background:var(--bg-hover); color:var(--txt); }
+
+  .preview-box {
+    background:var(--bg); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px;
+    line-height:1.7; color:var(--txt-2); max-height:400px; overflow-y:auto;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .preview-box .comment { color:var(--txt-3); }
+  .preview-box .keyword { color:var(--cyan); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:18px">
+  <a href="{% url 'mqtt_broker:dashboard' %}" class="btn-back">
+    ← Quay lại Dashboard Broker
+  </a>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="cfg-grid">
+
+    <!-- Paths Card -->
+    <div class="s-card">
+      <div class="s-head">
+        <div class="s-icon" style="background:linear-gradient(135deg,#7c3aed,#6366f1)">
+          <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:13.5px;font-weight:700">Đường dẫn</div>
+          <div style="font-size:12px;color:var(--txt-2)">Thư mục và file Mosquitto</div>
+        </div>
+      </div>
+      <div class="s-body">
+        <div class="field">
+          <label>Thư mục Mosquitto</label>
+          <input type="text" name="mosquitto_dir" class="mono" value="{{ form.mosquitto_dir.value|default:'' }}" />
+        </div>
+        <div class="field">
+          <label>File cấu hình (mosquitto.conf)</label>
+          <input type="text" name="config_path" class="mono" value="{{ form.config_path.value|default:'' }}" />
+        </div>
+        <div class="field">
+          <label>File mật khẩu (passwd)</label>
+          <input type="text" name="password_file" class="mono" value="{{ form.password_file.value|default:'' }}" />
+        </div>
+        <div class="field">
+          <label>File ACL</label>
+          <input type="text" name="acl_file" class="mono" value="{{ form.acl_file.value|default:'' }}" />
+        </div>
+        <div class="field">
+          <label>File Log</label>
+          <input type="text" name="log_file" class="mono" value="{{ form.log_file.value|default:'' }}" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Ports & Features Card -->
+    <div class="s-card">
+      <div class="s-head">
+        <div class="s-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div>
+          <div style="font-size:13.5px;font-weight:700">Cổng & Tính năng</div>
+          <div style="font-size:12px;color:var(--txt-2)">Ports, WebSocket, TLS</div>
+        </div>
+      </div>
+      <div class="s-body">
+        <div class="field-row">
+          <div class="field">
+            <label>Cổng MQTT</label>
+            <input type="number" name="port" class="mono" value="{{ form.port.value|default:'1883' }}" min="1" max="65535" />
+          </div>
+          <div class="field">
+            <label>Số kết nối tối đa</label>
+            <input type="number" name="max_connections" value="{{ form.max_connections.value|default:'100' }}" min="1" max="10000" />
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div style="font-size:13px;font-weight:500">Cho phép kết nối ẩn danh</div>
+            <div style="font-size:11.5px;color:var(--txt-2)">Không yêu cầu username/password</div>
+          </div>
+          <label class="ts"><input type="checkbox" name="allow_anonymous" {% if form.allow_anonymous.value %}checked{% endif %}/><span class="ts-sl"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div style="font-size:13px;font-weight:500">Bật WebSocket</div>
+            <div style="font-size:11.5px;color:var(--txt-2)">Cho phép kết nối MQTT qua WebSocket</div>
+          </div>
+          <label class="ts"><input type="checkbox" name="enable_websocket" {% if form.enable_websocket.value %}checked{% endif %}/><span class="ts-sl"></span></label>
+        </div>
+
+        <div class="field">
+          <label>Cổng WebSocket</label>
+          <input type="number" name="ws_port" class="mono" value="{{ form.ws_port.value|default:'9001' }}" min="1" max="65535" style="width:140px" />
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div style="font-size:13px;font-weight:500">Bật TLS/SSL</div>
+            <div style="font-size:11.5px;color:var(--txt-2)">Mã hoá kết nối MQTT</div>
+          </div>
+          <label class="ts"><input type="checkbox" name="enable_tls" {% if form.enable_tls.value %}checked{% endif %}/><span class="ts-sl"></span></label>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Cổng TLS</label>
+            <input type="number" name="tls_port" class="mono" value="{{ form.tls_port.value|default:'8883' }}" min="1" max="65535" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Certificate Path</label>
+            <input type="text" name="tls_cert_path" class="mono" value="{{ form.tls_cert_path.value|default:'' }}" placeholder="C:\certs\cert.pem" />
+          </div>
+          <div class="field">
+            <label>Private Key Path</label>
+            <input type="text" name="tls_key_path" class="mono" value="{{ form.tls_key_path.value|default:'' }}" placeholder="C:\certs\key.pem" />
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div style="font-size:13px;font-weight:500">Persistence (lưu trữ)</div>
+            <div style="font-size:11.5px;color:var(--txt-2)">Lưu messages khi broker restart</div>
+          </div>
+          <label class="ts"><input type="checkbox" name="enable_persistence" {% if form.enable_persistence.value %}checked{% endif %}/><span class="ts-sl"></span></label>
+        </div>
+      </div>
+
+      <div class="s-foot">
+        <button type="submit" class="btn-save">💾 Lưu & Ghi cấu hình</button>
+      </div>
+    </div>
+
+  </div>
+</form>
+
+<!-- Config Preview -->
+<div class="s-card" style="margin-top:22px">
+  <div class="s-head">
+    <div class="s-icon" style="background:linear-gradient(135deg,#059669,#047857)">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+    </div>
+    <div>
+      <div style="font-size:13.5px;font-weight:700">Preview: mosquitto.conf</div>
+      <div style="font-size:12px;color:var(--txt-2)">Nội dung file sẽ được ghi</div>
+    </div>
+  </div>
+  <div style="padding:16px">
+    <div class="preview-box">{{ config_preview }}</div>
+  </div>
+</div>
+
+{% endblock %}

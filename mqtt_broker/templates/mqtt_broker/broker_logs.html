@@ -1,0 +1,130 @@
+{% extends "dashboard/base.html" %}
+{% load auth_extras %}
+{% block title %}Logs Broker{% endblock %}
+{% block page_title %}Mosquitto Logs{% endblock %}
+
+{% block extra_head %}
+<style>
+  .btn-back { padding:8px 16px; border-radius:9px; border:1px solid var(--border-strong); background:none; color:var(--txt-2); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:background .15s; }
+  .btn-back:hover { background:var(--bg-hover); color:var(--txt); }
+
+  .log-container {
+    background:var(--bg); border:1px solid var(--border); border-radius:14px;
+    height:calc(100vh - 200px); min-height:400px; display:flex; flex-direction:column; overflow:hidden;
+  }
+  
+  .log-toolbar {
+    padding:12px 18px; border-bottom:1px solid var(--border); background:var(--bg-surface);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+  
+  .log-actions { display:flex; gap:10px; align-items:center; }
+  .log-btn { padding:6px 12px; border-radius:7px; border:1px solid var(--border-strong); background:var(--bg); color:var(--txt-2); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:background .15s; }
+  .log-btn:hover { background:var(--bg-hover); color:var(--txt); }
+  .log-btn.primary { background:rgba(56,189,248,.1); color:var(--cyan); border-color:var(--cyan); }
+  .log-btn.primary:hover { background:rgba(56,189,248,.2); }
+
+  .log-viewer {
+    flex:1; overflow-y:auto; padding:16px 20px;
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.7;
+    background:var(--bg); scroll-behavior:smooth;
+  }
+  
+  .log-line { border-bottom:1px solid rgba(255,255,255,0.03); padding:4px 0; word-break:break-all; display:flex; gap:10px; }
+  .log-line:hover { background:rgba(255,255,255,0.02); }
+  
+  .lvl-info   { color:var(--txt-2); }
+  .lvl-warning { color:var(--amber); font-weight:600; }
+  .lvl-error   { color:var(--red); font-weight:600; }
+  .lvl-debug   { color:var(--txt-3); }
+
+  .timestamp { color:var(--txt-3); flex-shrink:0; width:140px; display:inline-block; }
+  .msg { flex:1; }
+
+  /* Auto refresh toggle */
+  .auto-ref { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:var(--txt-2); }
+  .ts { position:relative; width:34px; height:20px; flex-shrink:0; cursor:pointer; }
+  .ts input { opacity:0; width:0; height:0; }
+  .ts-sl { position:absolute; inset:0; border-radius:99px; background:rgba(255,255,255,.08); border:1px solid var(--border-strong); transition:all .18s; }
+  .ts-sl::before { content:''; position:absolute; left:2px; top:50%; transform:translateY(-50%); width:12px; height:12px; background:var(--txt-2); border-radius:50%; transition:all .18s; }
+  .ts input:checked + .ts-sl { background:rgba(56,189,248,.2); border-color:var(--cyan); }
+  .ts input:checked + .ts-sl::before { background:var(--cyan); transform:translateX(16px) translateY(-50%); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:18px">
+  <a href="{% url 'mqtt_broker:dashboard' %}" class="btn-back">← Quay lại Dashboard Broker</a>
+</div>
+
+<div class="log-container">
+  <div class="log-toolbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--cyan);fill:none;stroke-width:2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        mosquitto.log
+      </div>
+      <span style="font-size:12px;color:var(--txt-3)">Hiển thị {{ lines_count }} dòng cuối</span>
+    </div>
+    <div class="log-actions">
+      <div class="auto-ref">
+        Auto Refresh (3s)
+        <label class="ts"><input type="checkbox" id="auto-refresh-chk" checked /><span class="ts-sl"></span></label>
+      </div>
+      <button class="log-btn primary" id="btn-refresh">Làm mới</button>
+      <form method="get" action="{% url 'mqtt_broker:logs' %}" style="display:flex;align-items:center;gap:5px">
+        <select name="lines" style="background:var(--bg);border:1px solid var(--border);color:var(--txt);border-radius:6px;font-size:12px;padding:5px">
+          <option value="50" {% if lines_count == 50 %}selected{% endif %}>50 lines</option>
+          <option value="100" {% if lines_count == 100 %}selected{% endif %}>100 lines</option>
+          <option value="500" {% if lines_count == 500 %}selected{% endif %}>500 lines</option>
+        </select>
+        <button type="submit" class="log-btn">Xem</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="log-viewer" id="log-viewer">
+    {% for entry in log_entries %}
+    <div class="log-line">
+      <div class="msg lvl-{{ entry.level }}">{{ entry.message }}</div>
+    </div>
+    {% empty %}
+    <div style="color:var(--txt-3);text-align:center;padding:40px">
+      Chưa có dòng log nào. Đảm bảo broker đang chạy và cấu hình log-dest là file.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  var viewer = document.getElementById('log-viewer');
+  var btnRef = document.getElementById('btn-refresh');
+  var autoChk = document.getElementById('auto-refresh-chk');
+  var lines = {{ lines_count }};
+  
+  // Nút Scroll xuống cuối
+  viewer.scrollTop = viewer.scrollHeight;
+
+  function fetchLogs() {
+    fetch('/broker/api/logs/?lines=' + lines)
+      .then(r => r.json())
+      .then(d => {
+        if(d.logs && d.logs.length > 0) {
+          var isAtBottom = viewer.scrollHeight - viewer.scrollTop <= viewer.clientHeight + 50;
+          viewer.innerHTML = d.logs.map(e => `<div class="log-line"><div class="msg lvl-${e.level}">${e.message}</div></div>`).join('');
+          if(isAtBottom) viewer.scrollTop = viewer.scrollHeight;
+        }
+      });
+  }
+
+  btnRef.addEventListener('click', fetchLogs);
+
+  setInterval(function(){
+    if(autoChk.checked) {
+      fetchLogs();
+    }
+  }, 3000);
+</script>
+{% endblock %}

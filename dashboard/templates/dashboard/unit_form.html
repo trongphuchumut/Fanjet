@@ -1,0 +1,135 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{% if action == 'add' %}Thêm bộ quạt{% else %}Sửa {{ unit.name }}{% endif %}{% endblock %}
+{% block page_title %}{% if action == 'add' %}Thêm bộ quạt mới{% else %}Sửa thông tin {{ unit.name }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .form-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; max-width:680px; }
+  .form-head { padding:16px 20px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12); display:flex; align-items:center; gap:10px; }
+  .form-head-icon { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .form-head-icon svg { width:15px; height:15px; stroke:#fff; fill:none; stroke-width:2; }
+  .form-body { padding:22px 24px; display:flex; flex-direction:column; gap:16px; }
+  .form-row  { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:540px){ .form-row { grid-template-columns:1fr; } }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--txt-2); }
+  .field input, .field select {
+    height:42px; padding:0 12px; background:var(--bg); border:1px solid var(--border-strong);
+    border-radius:9px; color:var(--txt); font-family:inherit; font-size:14px; outline:none;
+    transition:border-color .18s, box-shadow .18s; width:100%; -webkit-appearance:none; appearance:none;
+  }
+  .field input:focus, .field select:focus { border-color:var(--cyan); box-shadow:0 0 0 3px var(--cyan-glow); }
+  .field select { cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:36px; }
+  .field-hint { font-size:11px; color:var(--txt-3); }
+  .form-foot { padding:14px 24px; border-top:1px solid var(--border); background:rgba(0,0,0,.1); display:flex; gap:10px; align-items:center; }
+  .btn-primary { padding:9px 24px; border-radius:9px; border:none; background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 12px rgba(14,165,233,.3); transition:transform .15s,opacity .15s; }
+  .btn-primary:hover { transform:translateY(-1px); opacity:.9; }
+  .btn-cancel { padding:9px 18px; border-radius:9px; border:1px solid var(--border-strong); background:none; color:var(--txt-2); font-family:inherit; font-size:13.5px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; transition:background .15s; }
+  .btn-cancel:hover { background:var(--bg-hover); color:var(--txt); }
+  .err { color:var(--red); font-size:11.5px; margin-top:2px; }
+  .section-divider { border:none; border-top:1px solid var(--border); margin:4px 0; }
+  .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--txt-3); margin-bottom:4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-card">
+  <div class="form-head">
+    <div class="form-head-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">
+      {% if action == 'add' %}
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      {% else %}
+      <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      {% endif %}
+    </div>
+    <div>
+      <div style="font-size:14px;font-weight:700">{% if action == 'add' %}Thêm bộ quạt mới{% else %}Sửa thông tin{% endif %}</div>
+      <div style="font-size:12px;color:var(--txt-2)">{% if action == 'add' %}Khai báo bộ quạt vào hệ thống{% else %}{{ unit.unit_id }} – {{ unit.name }}{% endif %}</div>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-body">
+
+      <div class="section-label">Thông tin cơ bản</div>
+      <div class="form-row">
+        <div class="field">
+          <label for="id_unit_id">Mã bộ quạt *</label>
+          <input type="text" name="unit_id" id="id_unit_id" placeholder="U01"
+                 value="{{ form.unit_id.value|default:'' }}" maxlength="20"
+                 {% if action == 'edit' %}readonly style="opacity:.6;cursor:not-allowed"{% endif %} />
+          {% if form.unit_id.errors %}<div class="err">{{ form.unit_id.errors.0 }}</div>{% endif %}
+          <span class="field-hint">Mã duy nhất, ví dụ: U01, FAN-B1-01</span>
+        </div>
+        <div class="field">
+          <label for="id_name">Tên bộ quạt *</label>
+          <input type="text" name="name" id="id_name" placeholder="Bộ quạt 01"
+                 value="{{ form.name.value|default:'' }}" maxlength="100" />
+          {% if form.name.errors %}<div class="err">{{ form.name.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="id_zone">Khu vực *</label>
+          <input type="text" name="zone" id="id_zone" placeholder="B1, Tầng trệt, Khu A..."
+                 value="{{ form.zone.value|default:'' }}" maxlength="50" required />
+          {% if form.zone.errors %}<div class="err">{{ form.zone.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label for="id_location">Vị trí chi tiết</label>
+          <input type="text" name="location" id="id_location" placeholder="Khu A – Hành lang Bắc"
+                 value="{{ form.location.value|default:'' }}" maxlength="200" />
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+      <div class="section-label">MQTT</div>
+      <div class="field">
+        <label for="id_mqtt_topic_base">MQTT Topic Base</label>
+        <input type="text" name="mqtt_topic_base" id="id_mqtt_topic_base"
+               placeholder="Để trống → tự sinh từ prefix + unit_id"
+               value="{{ form.mqtt_topic_base.value|default:'' }}" maxlength="255"
+               style="font-family:'JetBrains Mono',monospace;font-size:13px" />
+        <span class="field-hint">
+          Ví dụ: <code style="color:var(--cyan)">fanjet/basement/U01</code>.
+          Topics sinh ra: <code style="color:var(--txt-2)">.../telemetry</code> (nhận), <code style="color:var(--txt-2)">.../command</code> (gửi).
+        </span>
+      </div>
+
+      <hr class="section-divider" />
+      <div class="section-label">Ngưỡng cảnh báo CO</div>
+      <div class="form-row">
+        <div class="field">
+          <label for="id_co_warn_ppm" style="color:var(--amber)">⚡ Ngưỡng cảnh báo (ppm)</label>
+          <input type="number" name="co_warn_ppm" id="id_co_warn_ppm"
+                 value="{{ form.co_warn_ppm.value|default:'25' }}" step="0.5" min="0" />
+          <span class="field-hint">Mặc định 25 ppm (mức cảnh báo bãi xe)</span>
+        </div>
+        <div class="field">
+          <label for="id_co_alarm_ppm" style="color:var(--red)">⚠ Ngưỡng báo động (ppm)</label>
+          <input type="number" name="co_alarm_ppm" id="id_co_alarm_ppm"
+                 value="{{ form.co_alarm_ppm.value|default:'50' }}" step="0.5" min="0" />
+          <span class="field-hint">Mặc định 50 ppm (nguy hiểm)</span>
+        </div>
+      </div>
+
+      {% if form.non_field_errors %}
+      <div style="padding:10px 14px;border-radius:8px;background:var(--red-dim);border:1px solid rgba(248,113,113,.25);color:var(--red);font-size:13px">
+        {{ form.non_field_errors }}
+      </div>
+      {% endif %}
+
+    </div>
+
+    <div class="form-foot">
+      <button type="submit" class="btn-primary">
+        {% if action == 'add' %}Thêm bộ quạt{% else %}Lưu thay đổi{% endif %}
+      </button>
+      <a href="{% if action == 'edit' %}{% url 'dashboard:unit_detail' unit.unit_id %}{% else %}{% url 'dashboard:units' %}{% endif %}"
+         class="btn-cancel">Hủy</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

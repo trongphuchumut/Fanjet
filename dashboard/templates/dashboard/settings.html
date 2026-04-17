@@ -1,0 +1,320 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Cấu hình{% endblock %}
+{% block page_title %}Cấu hình hệ thống{% endblock %}
+
+{% block extra_head %}
+<style>
+  .tab-bar { display:flex; gap:2px; margin-bottom:18px; background:var(--bg-surface);
+             border:1px solid var(--border); border-radius:10px; padding:4px; width:fit-content; }
+  .tab-btn { padding:7px 18px; border-radius:7px; border:none; background:none; color:var(--txt-2);
+             font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; }
+  .tab-btn.active { background:var(--bg-active); color:var(--txt-active); }
+  .tab-btn:hover  { background:var(--bg-hover); color:var(--txt); }
+  .tab-panel { display:none; } .tab-panel.active { display:block; }
+
+  .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  @media(max-width:800px){ .cfg-grid{ grid-template-columns:1fr; } }
+  .s-card  { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .s-head  { padding:14px 18px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12);
+             display:flex; align-items:center; gap:10px; }
+  .s-icon  { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .s-icon svg { width:14px; height:14px; stroke:#fff; fill:none; stroke-width:2; }
+  .s-body  { padding:18px; display:flex; flex-direction:column; gap:14px; }
+  .s-foot  { padding:12px 18px; border-top:1px solid var(--border); background:rgba(0,0,0,.1); display:flex; gap:10px; align-items:center; }
+
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:520px){ .field-row{ grid-template-columns:1fr; } }
+  .field label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.45px; color:var(--txt-2); }
+  .field input, .field select, .field textarea {
+    background:var(--bg); border:1px solid var(--border-strong); border-radius:9px;
+    color:var(--txt); font-family:inherit; font-size:13.5px; outline:none; padding:0 12px; height:40px;
+    transition:border-color .15s,box-shadow .15s; width:100%; -webkit-appearance:none;
+  }
+  .field textarea { height:auto; padding:10px 12px; resize:vertical; font-size:13px; line-height:1.5; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--cyan); box-shadow:0 0 0 3px var(--cyan-glow); }
+  .field input.mono { font-family:'JetBrains Mono',monospace; font-size:13px; }
+  .field-hint { font-size:11px; color:var(--txt-3); }
+
+  /* Toggle */
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .toggle-row:last-child { border-bottom:none; }
+  .ts { position:relative; width:40px; height:22px; flex-shrink:0; cursor:pointer; }
+  .ts input { opacity:0; width:0; height:0; }
+  .ts-sl { position:absolute; inset:0; border-radius:99px; background:rgba(255,255,255,.08); border:1px solid var(--border-strong); transition:all .18s; }
+  .ts-sl::before { content:''; position:absolute; left:3px; top:50%; transform:translateY(-50%); width:14px; height:14px; background:var(--txt-2); border-radius:50%; transition:all .18s; }
+  .ts input:checked + .ts-sl { background:rgba(56,189,248,.2); border-color:var(--cyan); }
+  .ts input:checked + .ts-sl::before { background:var(--cyan); transform:translateX(18px) translateY(-50%); }
+
+  /* Topic preview */
+  .topic-box { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan);
+               background:var(--bg-raised); border:1px solid var(--border); border-radius:8px;
+               padding:10px 14px; line-height:1.8; }
+  .topic-box span { display:block; }
+
+  /* Buttons */
+  .btn-save { padding:8px 20px; border-radius:9px; border:none; background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 2px 10px rgba(14,165,233,.25); transition:opacity .15s,transform .15s; }
+  .btn-save:hover { opacity:.88; transform:translateY(-1px); }
+  .btn-test { padding:8px 16px; border-radius:9px; border:1px solid var(--border-strong); background:none; color:var(--txt-2); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background .15s; }
+  .btn-test svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; }
+  .btn-test:hover { background:var(--bg-hover); color:var(--txt); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="tab-bar" role="tablist">
+  <button class="tab-btn active" data-tab="mqtt" role="tab">🔌 MQTT Broker</button>
+  <button class="tab-btn" data-tab="ollama" role="tab">🤖 AI Ollama</button>
+</div>
+
+<!-- ─── MQTT Tab ─────────────────────────────────────────────────────── -->
+<div class="tab-panel active" id="tab-mqtt">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="_tab" value="mqtt" />
+
+    <div class="cfg-grid">
+
+      <!-- Broker settings -->
+      <div class="s-card">
+        <div class="s-head">
+          <div class="s-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div>
+            <div style="font-size:13.5px;font-weight:700">MQTT Broker</div>
+            <div style="font-size:12px;color:var(--txt-2)">Thông tin kết nối máy chủ</div>
+          </div>
+        </div>
+        <div class="s-body">
+          <div class="field-row">
+            <div class="field">
+              <label>Địa chỉ Broker</label>
+              <input type="text" name="broker_host" class="mono"
+                     value="{{ mqtt_form.broker_host.value|default:'' }}" placeholder="192.168.1.100" id="inp-host" />
+            </div>
+            <div class="field">
+              <label>Cổng (Port)</label>
+              <input type="number" name="broker_port" class="mono"
+                     value="{{ mqtt_form.broker_port.value|default:'1883' }}" min="1" max="65535" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Tên đăng nhập</label>
+              <input type="text" name="username"
+                     value="{{ mqtt_form.username.value|default:'' }}" placeholder="(để trống nếu không có)" />
+            </div>
+            <div class="field">
+              <label>Mật khẩu</label>
+              <input type="password" name="password" placeholder="••••••••" autocomplete="new-password" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Client ID</label>
+            <input type="text" name="client_id" class="mono"
+                   value="{{ mqtt_form.client_id.value|default:'fanjet-web-01' }}" />
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div style="font-size:13px;font-weight:500">Dùng TLS/SSL (cổng 8883)</div>
+              <div style="font-size:11.5px;color:var(--txt-2)">Mã hoá kết nối</div>
+            </div>
+            <label class="ts"><input type="checkbox" name="use_tls" {% if mqtt_form.use_tls.value %}checked{% endif %}/><span class="ts-sl"></span></label>
+          </div>
+        </div>
+        <div class="s-foot">
+          <button type="submit" class="btn-save">Lưu cấu hình MQTT</button>
+          <button type="button" class="btn-test" id="btn-test-mqtt">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+            Kiểm tra kết nối
+          </button>
+        </div>
+      </div>
+
+      <!-- Topic config -->
+      <div class="s-card">
+        <div class="s-head">
+          <div class="s-icon" style="background:linear-gradient(135deg,#7c3aed,#6366f1)">
+            <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </div>
+          <div>
+            <div style="font-size:13.5px;font-weight:700">Topic MQTT</div>
+            <div style="font-size:12px;color:var(--txt-2)">Cấu trúc và QoS</div>
+          </div>
+        </div>
+        <div class="s-body">
+          <div class="field-row">
+            <div class="field">
+              <label>Tiền tố Topic</label>
+              <input type="text" name="topic_prefix" class="mono"
+                     value="{{ mqtt_form.topic_prefix.value|default:'fanjet/basement' }}"
+                     placeholder="fanjet/basement" id="inp-prefix" oninput="updatePreview()" />
+            </div>
+            <div class="field">
+              <label>Mức QoS</label>
+              <select name="qos">
+                <option value="0" {% if mqtt_form.qos.value == '0' or mqtt_form.qos.value == 0 %}selected{% endif %}>QoS 0 – At most once</option>
+                <option value="1" {% if mqtt_form.qos.value == '1' or mqtt_form.qos.value == 1 %}selected{% endif %}>QoS 1 – At least once</option>
+                <option value="2" {% if mqtt_form.qos.value == '2' or mqtt_form.qos.value == 2 %}selected{% endif %}>QoS 2 – Exactly once</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Keep Alive (giây)</label>
+            <input type="number" name="keep_alive" class="mono"
+                   value="{{ mqtt_form.keep_alive.value|default:'60' }}" min="10" max="3600" step="10" style="width:120px" />
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);margin-bottom:6px">Cấu trúc topic (ví dụ cho U01)</div>
+            <div class="topic-box" id="topic-preview">
+              <span id="tp-telemetry">fanjet/basement/<b>U01</b>/telemetry</span>
+              <span id="tp-command">fanjet/basement/<b>U01</b>/command</span>
+              <span id="tp-profile">fanjet/basement/<b>U01</b>/profile</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<!-- ─── Ollama Tab ───────────────────────────────────────────────────── -->
+<div class="tab-panel" id="tab-ollama">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="_tab" value="ollama" />
+
+    <div class="s-card" style="max-width:680px">
+      <div class="s-head">
+        <div class="s-icon" style="background:linear-gradient(135deg,#059669,#047857)">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:13.5px;font-weight:700">Cấu hình Ollama AI</div>
+          <div style="font-size:12px;color:var(--txt-2)">Chatbot AI dùng mô hình ngôn ngữ cục bộ</div>
+        </div>
+      </div>
+      <div class="s-body">
+        <div class="field-row">
+          <div class="field">
+            <label>Host Ollama</label>
+            <input type="text" name="host" class="mono"
+                   value="{{ ollama_form.host.value|default:'http://localhost:11434' }}"
+                   placeholder="http://localhost:11434" id="inp-ollama-host" />
+            <span class="field-hint">Địa chỉ Ollama đang chạy</span>
+          </div>
+          <div class="field">
+            <label>Model mặc định</label>
+            <input type="text" name="default_model" class="mono"
+                   value="{{ ollama_form.default_model.value|default:'llama3.2' }}"
+                   placeholder="llama3.2" id="inp-ollama-model" />
+            <span class="field-hint">Xem danh sách model bên dưới</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>System Prompt (tùy chỉnh nhân cách AI)</label>
+          <textarea name="system_prompt" rows="4">{{ ollama_form.system_prompt.value|default:'' }}</textarea>
+          <span class="field-hint">Dữ liệu quạt thực tế sẽ được tự động thêm vào sau prompt này.</span>
+        </div>
+
+        <!-- Available models -->
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);margin-bottom:8px">
+            Danh sách model đã cài (từ Ollama)
+          </div>
+          <div id="model-list" style="display:flex;flex-wrap:wrap;gap:6px">
+            <span style="color:var(--txt-3);font-size:12.5px">Đang tải…</span>
+          </div>
+        </div>
+
+      </div>
+      <div class="s-foot">
+        <button type="submit" class="btn-save">Lưu cấu hình AI</button>
+        <button type="button" class="btn-test" id="btn-test-ollama">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Kiểm tra kết nối Ollama
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Topic preview
+function updatePreview() {
+  var p = document.getElementById('inp-prefix').value || 'fanjet/basement';
+  document.getElementById('tp-telemetry').innerHTML = p+'/<b>U01</b>/telemetry';
+  document.getElementById('tp-command').innerHTML   = p+'/<b>U01</b>/command';
+  document.getElementById('tp-profile').innerHTML   = p+'/<b>U01</b>/profile';
+}
+
+// Test MQTT
+document.getElementById('btn-test-mqtt').addEventListener('click', function(){
+  var btn = this, orig = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Kiểm tra…';
+  var host = document.getElementById('inp-host').value;
+  setTimeout(function(){
+    btn.textContent = (host && host !== 'localhost') ? '✓ Có thể kết nối' : '✗ Vui lòng nhập IP broker';
+    btn.style.color = (host && host !== 'localhost') ? 'var(--green)' : 'var(--red)';
+    setTimeout(function(){ btn.innerHTML=orig; btn.disabled=false; btn.style.color=''; }, 2500);
+  }, 1600);
+});
+
+// Load Ollama models
+fetch('/dashboard/api/ollama/models/').then(function(r){return r.json();}).then(function(d){
+  var list = document.getElementById('model-list');
+  var cloudModels = [
+    'qwen3-coder:480b-cloud',
+    'deepseek-v3.1:671b-cloud',
+    'gpt-oss:120b-cloud',
+    'gpt-oss:20b-cloud',
+    'qwen3-vl:235b-cloud',
+    'minimax-m2:cloud',
+    'glm-4.6:cloud'
+  ];
+  var allModels = [...cloudModels];
+  if(d.ok && d.models.length){
+     d.models.forEach(function(m){ if(!allModels.includes(m)) allModels.push(m); });
+  }
+  
+  if(allModels.length > 0){
+    list.innerHTML = allModels.map(function(m){
+      return '<button type="button" onclick="selectModel(\''+m+'\')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--txt-2);font-family:\'JetBrains Mono\',monospace;font-size:12px;cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'\'">'+m+'</button>';
+    }).join('');
+  } else {
+    list.innerHTML = '<span style="color:var(--red);font-size:12.5px">⚠ Không kết nối được API tại host đã cấu hình</span>';
+  }
+});
+
+function selectModel(m) { document.getElementById('inp-ollama-model').value = m; }
+
+// Test Ollama
+document.getElementById('btn-test-ollama').addEventListener('click', function(){
+  var btn = this, orig = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Kiểm tra…';
+  fetch('/dashboard/api/ollama/models/').then(function(r){return r.json();}).then(function(d){
+    btn.innerHTML = orig; btn.disabled = false;
+    btn.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    alert(d.ok ? '✓ Ollama kết nối OK! Models: '+d.models.join(', ') : '✗ Lỗi: '+(d.error||'Không kết nối được'));
+    setTimeout(function(){ btn.style.color=''; }, 2000);
+  });
+});
+</script>
+{% endblock %}

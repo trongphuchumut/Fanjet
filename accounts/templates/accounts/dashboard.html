@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>Dashboard – FanJet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:     #0d1117;
+      --bg-surface:  #161b27;
+      --accent:      #6366f1;
+      --accent-glow: rgba(99,102,241,.30);
+      --txt:         #e6edf3;
+      --txt-muted:   #8b949e;
+      --border:      rgba(255,255,255,0.08);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg-base);
+      color: var(--txt);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: clamp(28px,6vw,52px) clamp(20px,6vw,44px);
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 24px 48px rgba(0,0,0,.45);
+      animation: fadeUp .45s cubic-bezier(.4,0,.2,1) both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(18px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .check-circle {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: rgba(63,185,80,.14);
+      border: 1px solid rgba(63,185,80,.30);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+
+    .check-circle svg { width: 28px; height: 28px; stroke: #3fb950; stroke-width: 2.5; fill: none; }
+
+    h1 { font-size: clamp(18px,4vw,22px); font-weight: 700; margin-bottom: 8px; }
+
+    p { color: var(--txt-muted); font-size: 14px; line-height: 1.6; margin-bottom: 28px; }
+    p strong { color: var(--txt); font-weight: 600; }
+
+    .btn-logout {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      transition: transform .22s ease, box-shadow .22s ease;
+    }
+
+    .btn-logout:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(99,102,241,.55);
+    }
+
+    .btn-logout svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="check-circle" aria-hidden="true">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20,6 9,17 4,12"/>
+      </svg>
+    </div>
+    <h1>Đăng nhập thành công!</h1>
+    <p>
+      Chào mừng trở lại,&nbsp;<strong>{{ request.user.get_full_name|default:request.user.username }}</strong>.<br/>
+      Bạn đang xem trang Dashboard của FanJet.
+    </p>
+    <a href="{% url 'accounts:logout' %}" class="btn-logout" id="btn-logout">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+        <polyline points="16,17 21,12 16,7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Đăng xuất
+    </a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,124 @@
+{% extends "dashboard/base.html" %}
+{% load auth_extras %}
+{% block title %}Bộ quạt{% endblock %}
+{% block page_title %}Quản lý bộ quạt{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+  <div style="font-size:13.5px;color:var(--txt-2)">{{ units.count }} bộ quạt đã đăng ký</div>
+  {% if request.user|has_role:'Admin' %}
+  <a href="{% url 'dashboard:unit_add' %}"
+     style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:9px;
+            background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-weight:700;
+            font-size:13.5px;text-decoration:none;box-shadow:0 2px 12px rgba(14,165,233,.3);
+            transition:opacity .15s,transform .15s;">
+    <svg style="width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Thêm bộ quạt
+  </a>
+  {% endif %}
+</div>
+
+{% if units %}
+<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          {% for h in "Mã,Tên,Khu vực,Vị trí,Chế độ,CO hiện tại,Tốc độ,Trạng thái,Hành động" %}{% endfor %}
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Mã</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Tên</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Khu vực</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Vị trí</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Chế độ</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">CO hiện tại</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Tốc độ</th>
+          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Trạng thái</th>
+          {% if request.user|has_role:'Admin' %}<th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.45px;color:var(--txt-3);padding:11px 14px;border-bottom:1px solid var(--border)">Hành động</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for unit in units %}
+        {% with cos=unit.co_status online=unit.is_online %}
+        <tr style="border-bottom:1px solid var(--border);transition:background .12s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+          <td style="padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--cyan);font-weight:600">{{ unit.unit_id }}</td>
+          <td style="padding:12px 14px;font-weight:600;font-size:13.5px">{{ unit.name }}</td>
+          <td style="padding:12px 14px">
+            <span style="padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;
+                         background:var(--bg-raised);border:1px solid var(--border)">{{ unit.zone }}</span>
+          </td>
+          <td style="padding:12px 14px;font-size:13px;color:var(--txt-2)">{{ unit.location|default:"—" }}</td>
+          <td style="padding:12px 14px">
+            <span style="padding:2px 9px;border-radius:99px;font-size:11px;font-weight:800;
+                         {% if unit.control_mode == 'auto' %}background:var(--cyan-dim);color:var(--cyan)
+                         {% else %}background:rgba(129,140,248,.15);color:var(--indigo){% endif %}">
+              {{ unit.control_mode|upper }}
+            </span>
+          </td>
+          <td style="padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;
+                     {% if cos == 'alarm' %}color:var(--red){% elif cos == 'warning' %}color:var(--amber){% endif %}">
+            {% if unit.last_co_ppm is not None %}{{ unit.last_co_ppm|floatformat:1 }} ppm{% else %}—{% endif %}
+          </td>
+          <td style="padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:13px">
+            {% if unit.last_speed_pct is not None %}{{ unit.last_speed_pct }}%{% else %}—{% endif %}
+          </td>
+          <td style="padding:12px 14px">
+            {% if unit.last_tripped %}
+            <span style="padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;
+                         background:var(--red-dim);color:var(--red);border:1px solid rgba(248,113,113,.25)">⚠ TRIP</span>
+            {% elif online %}
+            <span style="padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;
+                         background:var(--green-dim);color:var(--green)">● Online</span>
+            {% else %}
+            <span style="padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;
+                         background:rgba(148,163,184,.1);color:var(--txt-3)">○ Offline</span>
+            {% endif %}
+          </td>
+          {% if request.user|has_role:'Admin' %}
+          <td style="padding:12px 14px">
+            <div style="display:flex;gap:6px">
+              <a href="{% url 'dashboard:unit_detail' unit.unit_id %}"
+                 style="padding:4px 10px;border-radius:7px;font-size:12px;font-weight:600;
+                        border:1px solid var(--border);color:var(--txt-2);text-decoration:none;
+                        transition:all .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">Cấu hình</a>
+              <a href="{% url 'dashboard:unit_edit' unit.unit_id %}"
+                 style="padding:4px 10px;border-radius:7px;font-size:12px;font-weight:600;
+                        border:1px solid var(--border);color:var(--txt-2);text-decoration:none;
+                        transition:all .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">Sửa</a>
+              <form method="post" action="{% url 'dashboard:unit_delete' unit.unit_id %}"
+                    onsubmit="return confirm('Xóa bộ quạt {{ unit.name }}?')" style="display:inline">
+                {% csrf_token %}
+                <button type="submit" style="padding:4px 10px;border-radius:7px;font-size:12px;font-weight:600;
+                                             border:1px solid rgba(248,113,113,.25);color:var(--red);background:none;
+                                             cursor:pointer;transition:all .15s">Xóa</button>
+              </form>
+            </div>
+          </td>
+          {% else %}
+          <td style="padding:12px 14px">
+            <a href="{% url 'dashboard:unit_detail' unit.unit_id %}"
+               style="padding:4px 10px;border-radius:7px;font-size:12px;font-weight:600;
+                      border:1px solid var(--border);color:var(--txt-2);text-decoration:none;
+                      transition:all .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">Xem chi tiết</a>
+          </td>
+          {% endif %}
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div style="text-align:center;padding:80px 20px;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px">
+  <div style="font-size:48px;margin-bottom:12px">🌀</div>
+  <div style="font-size:16px;font-weight:700;margin-bottom:8px">Chưa có bộ quạt nào</div>
+  <div style="color:var(--txt-2);margin-bottom:20px">Thêm bộ quạt để bắt đầu quản lý hệ thống</div>
+  {% if request.user|has_role:'Admin' %}
+  <a href="{% url 'dashboard:unit_add' %}"
+     style="display:inline-flex;align-items:center;gap:7px;padding:10px 24px;border-radius:9px;
+            background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-weight:700;text-decoration:none">
+    + Thêm bộ quạt đầu tiên
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

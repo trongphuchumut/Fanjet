@@ -1,0 +1,483 @@
+{% load auth_extras %}
+<!DOCTYPE html>
+<html lang="vi" data-sidebar="expanded">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>{% block title %}FanJet{% endblock %} – FanJet BMS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══ TOKENS ═══════════════════════════════════ */
+    :root {
+      --bg:            #0d1117;
+      --bg-surface:    #161b27;
+      --bg-raised:     #1c2333;
+      --bg-hover:      rgba(255,255,255,0.05);
+      --bg-active:     rgba(56,189,248,0.12);
+
+      --border:        rgba(255,255,255,0.07);
+      --border-strong: rgba(255,255,255,0.13);
+
+      --cyan:          #38bdf8;
+      --cyan-dim:      rgba(56,189,248,0.25);
+      --cyan-glow:     rgba(56,189,248,0.18);
+      --green:         #4ade80;
+      --green-dim:     rgba(74,222,128,0.15);
+      --red:           #f87171;
+      --red-dim:       rgba(248,113,113,0.15);
+      --amber:         #fbbf24;
+      --amber-dim:     rgba(251,191,36,0.15);
+      --indigo:        #818cf8;
+
+      --txt:           #e2e8f0;
+      --txt-2:         #94a3b8;
+      --txt-3:         #475569;
+      --txt-active:    #7dd3fc;
+
+      --sidebar-w:     248px;
+      --sidebar-col:   64px;
+      --topbar-h:      56px;
+      --ease:          cubic-bezier(.4,0,.2,1);
+      --dur:           .22s;
+      --r:             10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: -webkit-fill-available; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--txt);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      display: flex;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* ═══ OVERLAY ═══════════════════════════════════ */
+    #overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 40;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(3px);
+    }
+
+    /* ═══ SIDEBAR ═══════════════════════════════════ */
+    #sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 50;
+      width: var(--sidebar-w);
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: width var(--dur) var(--ease), transform var(--dur) var(--ease);
+      overflow: hidden;
+    }
+    [data-sidebar="collapsed"] #sidebar { width: var(--sidebar-col); }
+
+    /* Brand */
+    .sb-brand {
+      height: var(--topbar-h);
+      padding: 0 14px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .sb-logo {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, #0ea5e9, #0284c7);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.10) inset, 0 4px 14px rgba(14,165,233,0.35);
+    }
+    .sb-logo svg { width: 18px; height: 18px; }
+
+    .sb-brand-text { overflow: hidden; }
+    .sb-brand-name {
+      font-size: 15px; font-weight: 800; letter-spacing: -0.3px;
+      white-space: nowrap;
+      transition: opacity var(--dur) var(--ease);
+    }
+    .sb-brand-name em { font-style: normal; color: var(--cyan); }
+    .sb-brand-sub {
+      font-size: 10px; color: var(--txt-3); font-weight: 500;
+      white-space: nowrap; letter-spacing: 0.3px;
+      transition: opacity var(--dur) var(--ease);
+    }
+    [data-sidebar="collapsed"] .sb-brand-text { opacity: 0; width: 0; }
+
+    /* Nav */
+    .sb-nav {
+      flex: 1;
+      padding: 10px 8px;
+      overflow-y: auto; overflow-x: hidden;
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .sb-section {
+      font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.9px; color: var(--txt-3);
+      padding: 10px 8px 4px;
+      white-space: nowrap;
+      transition: opacity var(--dur) var(--ease);
+    }
+    [data-sidebar="collapsed"] .sb-section { opacity: 0; }
+
+    .sb-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: var(--r);
+      text-decoration: none; color: var(--txt-2);
+      font-size: 13.5px; font-weight: 500;
+      white-space: nowrap; position: relative;
+      transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+      overflow: hidden;
+    }
+    .sb-link:hover { background: var(--bg-hover); color: var(--txt); }
+    .sb-link.active { background: var(--bg-active); color: var(--txt-active); }
+    .sb-link.active::before {
+      content: '';
+      position: absolute; left: 0; top: 20%; bottom: 20%;
+      width: 3px; border-radius: 0 3px 3px 0;
+      background: var(--cyan);
+    }
+    .sb-icon {
+      width: 18px; height: 18px; flex-shrink: 0;
+      stroke: currentColor; stroke-width: 1.8; fill: none;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .sb-label { transition: opacity var(--dur) var(--ease); }
+    [data-sidebar="collapsed"] .sb-label { opacity: 0; width: 0; overflow: hidden; }
+
+    .sb-badge {
+      margin-left: auto; flex-shrink: 0;
+      font-size: 10px; font-weight: 700;
+      padding: 1.5px 6px; border-radius: 99px;
+      transition: opacity var(--dur) var(--ease);
+    }
+    .sb-badge.fault  { background: var(--red-dim);   color: var(--red); }
+    .sb-badge.ok     { background: var(--green-dim);  color: var(--green); }
+    .sb-badge.info   { background: var(--cyan-dim);   color: var(--cyan); }
+
+    [data-sidebar="collapsed"] .sb-badge { opacity: 0; pointer-events: none; }
+
+    /* Tooltip on collapsed */
+    [data-sidebar="collapsed"] .sb-link::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: calc(var(--sidebar-col) - 6px); top: 50%;
+      transform: translateY(-50%);
+      background: var(--bg-raised);
+      border: 1px solid var(--border-strong);
+      color: var(--txt); font-size: 12px; font-weight: 500;
+      padding: 5px 10px; border-radius: 7px;
+      white-space: nowrap; opacity: 0; pointer-events: none; z-index: 100;
+      transition: opacity .15s var(--ease);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+    [data-sidebar="collapsed"] .sb-link:hover::after { opacity: 1; }
+
+    /* User footer */
+    .sb-footer {
+      padding: 8px 8px 10px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    /* MQTT status pill */
+    .mqtt-pill {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; border-radius: var(--r);
+      background: var(--bg-raised); border: 1px solid var(--border);
+      margin-bottom: 6px; overflow: hidden;
+      transition: opacity var(--dur) var(--ease);
+    }
+    [data-sidebar="collapsed"] .mqtt-pill { opacity: 0; pointer-events: none; }
+    .mqtt-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .mqtt-dot.connected    { background: var(--green); box-shadow: 0 0 0 3px rgba(74,222,128,.2); animation: pulse-g 2s ease-in-out infinite; }
+    .mqtt-dot.disconnected { background: var(--red);   box-shadow: 0 0 0 3px rgba(248,113,113,.2); }
+    @keyframes pulse-g { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .mqtt-pill-text { font-size: 11px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .sb-user {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 10px; border-radius: var(--r);
+      cursor: pointer; overflow: hidden;
+      transition: background var(--dur) var(--ease);
+    }
+    .sb-user:hover { background: var(--bg-hover); }
+    .sb-avatar {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, #0ea5e9, #7c3aed);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: #fff;
+    }
+    .sb-user-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: opacity var(--dur) var(--ease); }
+    .sb-user-role { font-size: 10.5px; color: var(--txt-3); white-space: nowrap; transition: opacity var(--dur) var(--ease); }
+    [data-sidebar="collapsed"] .sb-user-name,
+    [data-sidebar="collapsed"] .sb-user-role { opacity: 0; }
+
+    /* ═══ MAIN ═══════════════════════════════════ */
+    #main-area {
+      margin-left: var(--sidebar-w);
+      flex: 1; display: flex; flex-direction: column;
+      min-height: 100vh; min-width: 0;
+      transition: margin-left var(--dur) var(--ease);
+    }
+    [data-sidebar="collapsed"] #main-area { margin-left: var(--sidebar-col); }
+
+    /* Topbar */
+    #topbar {
+      height: var(--topbar-h);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 18px;
+      display: flex; align-items: center; gap: 10px;
+      position: sticky; top: 0; z-index: 30; flex-shrink: 0;
+    }
+    .btn-hamburger {
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; border-radius: 8px;
+      color: var(--txt-2); cursor: pointer;
+      transition: background var(--dur), color var(--dur);
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+    }
+    .btn-hamburger:hover { background: var(--bg-hover); color: var(--txt); }
+    .btn-hamburger svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none; }
+    .topbar-title { font-size: 15px; font-weight: 700; flex: 1; }
+
+    /* MQTT connection status in topbar */
+    .topbar-mqtt {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 12px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-size: 12px; font-weight: 600;
+      color: var(--txt-2);
+    }
+    .topbar-mqtt .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .topbar-mqtt.ok   .dot { background: var(--green); animation: pulse-g 2s ease-in-out infinite; }
+    .topbar-mqtt.err  .dot { background: var(--red); }
+    .topbar-mqtt.ok { color: var(--green); border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); }
+    .topbar-mqtt.err{ color: var(--red);   border-color: rgba(248,113,113,0.25); background: rgba(248,113,113,0.08); }
+    @media (max-width: 500px) { .topbar-mqtt span { display: none; } }
+
+    .topbar-actions { display: flex; align-items: center; gap: 4px; }
+    .topbar-btn {
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; border-radius: 8px;
+      color: var(--txt-2); cursor: pointer; text-decoration: none;
+      transition: background var(--dur), color var(--dur);
+      -webkit-tap-highlight-color: transparent; position: relative;
+    }
+    .topbar-btn:hover { background: var(--bg-hover); color: var(--txt); }
+    .topbar-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); border: 1.5px solid var(--bg-surface); }
+    .topbar-avatar {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, #0ea5e9, #7c3aed);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: #fff; cursor: pointer;
+    }
+
+    /* Content */
+    #page-content { flex: 1; overflow-y: auto; padding: clamp(14px,3vw,26px); }
+
+    /* ═══ RESPONSIVE ═══════════════════════════════ */
+    @media (max-width: 767px) {
+      #sidebar { transform: translateX(-100%); width: var(--sidebar-w) !important; }
+      [data-sidebar="mobile-open"] #sidebar { transform: translateX(0); }
+      [data-sidebar="mobile-open"] #overlay { display: block; }
+      #main-area { margin-left: 0 !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div id="overlay" aria-hidden="true"></div>
+
+<!-- ═══ SIDEBAR ═══════════════════════════ -->
+<aside id="sidebar" role="navigation" aria-label="Menu chính">
+
+  <div class="sb-brand">
+    <div class="sb-logo" aria-hidden="true">
+      <!-- Fan icon -->
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="2.5" fill="white"/>
+        <path d="M12 12 C10 7 5 4 4 7 C3 10 9 12 12 12Z" fill="white" opacity="0.85"/>
+        <path d="M12 12 C10 7 5 4 4 7 C3 10 9 12 12 12Z" fill="white" opacity="0.85" transform="rotate(120 12 12)"/>
+        <path d="M12 12 C10 7 5 4 4 7 C3 10 9 12 12 12Z" fill="white" opacity="0.85" transform="rotate(240 12 12)"/>
+        <circle cx="12" cy="12" r="1.5" fill="rgba(255,255,255,0.5)"/>
+      </svg>
+    </div>
+    <div class="sb-brand-text">
+      <div class="sb-brand-name">Fan<em>Jet</em> BMS</div>
+      <div class="sb-brand-sub">Quản lý quạt tầng hầm</div>
+    </div>
+  </div>
+
+  <nav class="sb-nav">
+
+    <span class="sb-section">Giám sát</span>
+
+    <a href="{% url 'dashboard:home' %}" class="sb-link {% if page == 'home' %}active{% endif %}" data-tip="Tổng quan" id="nav-home">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="sb-label">Tổng quan</span>
+      {% if faults %}<span class="sb-badge fault">{{ faults }} trip</span>{% endif %}
+    </a>
+
+    <a href="{% url 'dashboard:units' %}" class="sb-link {% if page == 'units' %}active{% endif %}" data-tip="Bộ quạt" id="nav-units">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"/><ellipse cx="12" cy="6" rx="4" ry="6" fill="currentColor" opacity=".6" transform="rotate(0 12 12)"/><ellipse cx="12" cy="6" rx="4" ry="6" fill="currentColor" opacity=".6" transform="rotate(120 12 12)"/><ellipse cx="12" cy="6" rx="4" ry="6" fill="currentColor" opacity=".6" transform="rotate(240 12 12)"/></svg>
+      <span class="sb-label">Bộ quạt</span>
+    </a>
+
+    <a href="{% url 'dashboard:monitor' %}" class="sb-link {% if page == 'monitor' %}active{% endif %}" data-tip="Giám sát MQTT" id="nav-monitor">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+      <span class="sb-label">Giám sát MQTT</span>
+      <span class="sb-badge info">Live</span>
+    </a>
+
+    <a href="{% url 'dashboard:analytics' %}" class="sb-link {% if page == 'analytics' %}active{% endif %}" data-tip="Phân tích" id="nav-analytics">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="sb-label">Phân tích</span>
+    </a>
+
+    <span class="sb-section">Hệ thống</span>
+
+    <a href="{% url 'dashboard:chatbot' %}" class="sb-link {% if page == 'chatbot' %}active{% endif %}" data-tip="AI Chatbot" id="nav-chatbot">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span class="sb-label">AI Chatbot</span>
+    </a>
+
+    {% if request.user|has_role:'Admin' %}
+    <a href="{% url 'mqtt_broker:dashboard' %}" class="sb-link {% if page == 'broker' %}active{% endif %}" data-tip="MQTT Broker" id="nav-broker">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span class="sb-label">MQTT Broker</span>
+    </a>
+
+    <a href="{% url 'dashboard:settings' %}" class="sb-link {% if page == 'settings' %}active{% endif %}" data-tip="Cấu hình" id="nav-settings">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="sb-label">Cấu hình</span>
+    </a>
+    {% endif %}
+
+    <a href="{% url 'accounts:logout' %}" class="sb-link" data-tip="Đăng xuất" id="nav-logout">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="sb-label">Đăng xuất</span>
+    </a>
+
+  </nav>
+
+  <div class="sb-footer">
+    <!-- MQTT status mini pill -->
+    <div class="mqtt-pill">
+      <span class="mqtt-dot {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}connected{% else %}disconnected{% endif %}"></span>
+      <span class="mqtt-pill-text">
+        {% if mqtt_config %}{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }}{% else %}Chưa cấu hình{% endif %}
+      </span>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" aria-hidden="true">{{ request.user.username|first|upper }}</div>
+      <div>
+        <div class="sb-user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div class="sb-user-role">{% if request.user.is_superuser or request.user|has_role:'Admin' %}Quản trị viên{% elif request.user|has_role:'Operator' %}Vận hành{% else %}Người xem{% endif %}</div>
+      </div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ═══ MAIN ═══════════════════════════════ -->
+<div id="main-area">
+
+  <header id="topbar">
+    <button class="btn-hamburger" id="btn-hamburger" aria-label="Menu" aria-expanded="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <line x1="3" y1="6"  x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+
+    <span class="topbar-title">{% block page_title %}FanJet BMS{% endblock %}</span>
+
+    <!-- MQTT status chip -->
+    <div class="topbar-mqtt {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}ok{% else %}err{% endif %}" id="topbar-mqtt-chip">
+      <span class="dot"></span>
+      <span>{% if mqtt_config and mqtt_config.broker_host != 'localhost' %}Đã kết nối{% else %}Chưa kết nối{% endif %}</span>
+    </div>
+
+    <div class="topbar-actions">
+      <a href="{% url 'dashboard:settings' %}" class="topbar-btn" aria-label="Cấu hình MQTT">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      </a>
+      <a href="{% url 'accounts:logout' %}" class="topbar-btn" aria-label="Đăng xuất">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+          <polyline points="16,17 21,12 16,7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </a>
+      <div class="topbar-avatar">{{ request.user.username|first|upper }}</div>
+    </div>
+  </header>
+
+  <main id="page-content">
+    {% if messages %}
+    <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
+      {% for msg in messages %}
+      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;font-size:13.5px;font-weight:500;
+        {% if msg.tags == 'success' %}background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.28);color:#4ade80{% elif msg.tags == 'error' %}background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.28);color:#f87171{% else %}background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.28);color:#38bdf8{% endif %}">
+        {{ msg }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script>
+(function(){
+  var html = document.documentElement;
+  var btn  = document.getElementById('btn-hamburger');
+  var ov   = document.getElementById('overlay');
+  var KEY  = 'fj_sb';
+  var BP   = 767;
+  function mobile(){ return window.innerWidth <= BP; }
+  if(!mobile()){ var s=localStorage.getItem(KEY); if(s) html.dataset.sidebar=s; }
+  function toggle(){
+    if(mobile()){
+      html.dataset.sidebar = html.dataset.sidebar==='mobile-open'?'':'mobile-open';
+    } else {
+      var c = html.dataset.sidebar==='collapsed';
+      html.dataset.sidebar = c?'expanded':'collapsed';
+      localStorage.setItem(KEY, html.dataset.sidebar);
+      btn.setAttribute('aria-expanded', String(c));
+    }
+  }
+  btn.addEventListener('click', toggle);
+  ov.addEventListener('click', function(){ html.dataset.sidebar=''; });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape'&&mobile()) html.dataset.sidebar=''; });
+  window.addEventListener('resize', function(){ if(!mobile()&&html.dataset.sidebar==='mobile-open') html.dataset.sidebar='expanded'; });
+})();
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

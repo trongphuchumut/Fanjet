@@ -1,0 +1,306 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Phân tích{% endblock %}
+{% block page_title %}Phân tích dữ liệu quạt{% endblock %}
+
+{% block extra_head %}
+<style>
+  .an-grid { display:grid; grid-template-columns:240px 1fr; gap:16px; align-items:start; }
+  @media(max-width:900px){ .an-grid{ grid-template-columns:1fr; } }
+
+  /* Side selector */
+  .an-side { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; position:sticky; top:72px; }
+  .an-side-head { padding:12px 16px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12); font-size:12.5px; font-weight:700; color:var(--txt-2); text-transform:uppercase; letter-spacing:.4px; }
+  .unit-item { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04); transition:background .12s; }
+  .unit-item:last-child{ border-bottom:none; }
+  .unit-item:hover{ background:var(--bg-hover); }
+  .unit-item.active{ background:var(--bg-active); }
+  .unit-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .unit-item-info { flex:1; min-width:0; }
+  .unit-item-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .unit-item-id { font-size:11px; color:var(--txt-3); font-family:'JetBrains Mono',monospace; }
+
+  .range-buttons { display:flex; gap:0; }
+  .range-btn { flex:1; padding:6px 0; border:1px solid var(--border); background:none; color:var(--txt-2); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; }
+  .range-btn:first-child { border-radius:7px 0 0 7px; }
+  .range-btn:last-child  { border-radius:0 7px 7px 0; }
+  .range-btn.active { background:var(--bg-active); border-color:var(--cyan-dim); color:var(--txt-active); }
+
+  /* Charts */
+  .chart-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .chart-head { padding:12px 18px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.1); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .chart-title { font-size:13.5px; font-weight:700; }
+  .chart-body  { padding:16px; }
+  svg.linechart { display:block; width:100%; overflow:visible; }
+  .lc-line-co    { stroke:#38bdf8; stroke-width:2; fill:none; }
+  .lc-area-co    { fill:rgba(56,189,248,.08); }
+  .lc-line-spd   { stroke:#4ade80; stroke-width:2; fill:none; }
+  .lc-area-spd   { fill:rgba(74,222,128,.08); }
+  .lc-trip       { fill:#f87171; }
+  .lc-grid       { stroke:rgba(255,255,255,.05); stroke-width:1; }
+  .lc-axis       { stroke:rgba(255,255,255,.12); stroke-width:1; }
+  .lc-lbl        { font-size:10px; fill:#475569; font-family:'JetBrains Mono',monospace; }
+  .lc-warn       { stroke:rgba(251,191,36,.3); stroke-width:1; stroke-dasharray:4 3; }
+  .lc-alarm      { stroke:rgba(248,113,113,.3); stroke-width:1; stroke-dasharray:4 3; }
+  .loading-msg   { text-align:center; padding:40px; color:var(--txt-3); font-size:13px; }
+  .no-data-msg   { text-align:center; padding:40px; color:var(--txt-3); font-size:13px; }
+
+  /* Stat pills */
+  .stat-pills{ display:flex; gap:10px; flex-wrap:wrap; }
+  .stat-pill { background:var(--bg-raised); border:1px solid var(--border); border-radius:10px; padding:10px 16px; }
+  .sp-val { font-size:20px; font-weight:800; letter-spacing:-.3px; }
+  .sp-lbl { font-size:11px; color:var(--txt-2); font-weight:600; text-transform:uppercase; letter-spacing:.35px; margin-top:1px; }
+
+  .empty-state { grid-column:1/-1; text-align:center; padding:80px 20px; background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if not units %}
+<div class="empty-state">
+  <div style="font-size:44px;margin-bottom:10px">📊</div>
+  <div style="font-size:15px;font-weight:700;margin-bottom:6px">Chưa có bộ quạt nào</div>
+  <div style="color:var(--txt-2);margin-bottom:18px">Thêm bộ quạt để xem phân tích dữ liệu CO và tốc độ</div>
+  <a href="{% url 'dashboard:unit_add' %}" style="display:inline-flex;align-items:center;gap:7px;padding:10px 24px;border-radius:9px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-weight:700;text-decoration:none">+ Thêm bộ quạt</a>
+</div>
+{% else %}
+
+<div class="an-grid">
+
+  <!-- Side panel: unit selector + range -->
+  <div>
+    <div class="an-side">
+      <div class="an-side-head">Chọn bộ quạt</div>
+      <div id="unit-list">
+        {% for unit in units %}
+        <div class="unit-item {% if forloop.first %}active{% endif %}"
+             data-uid="{{ unit.unit_id }}"
+             data-warn="{{ unit.co_warn_ppm }}"
+             data-alarm="{{ unit.co_alarm_ppm }}"
+             onclick="selectUnit(this)">
+          <span class="unit-dot" style="background:{% if unit.last_tripped %}var(--red){% elif unit.is_online %}var(--green){% else %}var(--txt-3){% endif %}"></span>
+          <div class="unit-item-info">
+            <div class="unit-item-name">{{ unit.name }}</div>
+            <div class="unit-item-id">{{ unit.unit_id }} · {{ unit.zone }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Range selector -->
+    <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-2);margin-bottom:8px">Khoảng thời gian</div>
+      <div class="range-buttons">
+        <button class="range-btn" data-hours="1">1h</button>
+        <button class="range-btn" data-hours="6">6h</button>
+        <button class="range-btn active" data-hours="24">24h</button>
+        <button class="range-btn" data-hours="168">7 ngày</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts area -->
+  <div style="display:flex; flex-direction:column; gap:14px;">
+
+    <!-- Summary pills -->
+    <div class="stat-pills" id="stat-pills">
+      <div class="stat-pill"><div class="sp-val" id="sp-avg-co">—</div><div class="sp-lbl">CO TB (ppm)</div></div>
+      <div class="stat-pill"><div class="sp-val" id="sp-max-co">—</div><div class="sp-lbl">CO cao nhất</div></div>
+      <div class="stat-pill"><div class="sp-val" id="sp-avg-spd">—</div><div class="sp-lbl">Tốc độ TB (%)</div></div>
+      <div class="stat-pill"><div class="sp-val" id="sp-trips">—</div><div class="sp-lbl">Sự kiện Trip</div></div>
+      <div class="stat-pill"><div class="sp-val" id="sp-records">—</div><div class="sp-lbl">Bản ghi</div></div>
+    </div>
+
+    <!-- CO chart -->
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-title">🌡 Nồng độ CO theo thời gian (ppm)</div>
+        <div id="co-range-lbl" style="font-size:12px;color:var(--txt-2)">24h gần nhất</div>
+      </div>
+      <div class="chart-body" id="co-chart-body">
+        <div class="loading-msg">Đang tải dữ liệu…</div>
+      </div>
+    </div>
+
+    <!-- Speed chart -->
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-title">⚡ Tốc độ quạt theo thời gian (%)</div>
+        <div id="spd-range-lbl" style="font-size:12px;color:var(--txt-2)"></div>
+      </div>
+      <div class="chart-body" id="spd-chart-body">
+        <div class="loading-msg">Đang tải dữ liệu…</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% if units %}
+<script>
+var currentUid   = '{{ units.0.unit_id }}';
+var currentHours = 24;
+var currentWarn  = {{ units.0.co_warn_ppm }};
+var currentAlarm = {{ units.0.co_alarm_ppm }};
+
+// Unit selection
+function selectUnit(el) {
+  document.querySelectorAll('.unit-item').forEach(function(i){ i.classList.remove('active'); });
+  el.classList.add('active');
+  currentUid   = el.dataset.uid;
+  currentWarn  = parseFloat(el.dataset.warn)||25;
+  currentAlarm = parseFloat(el.dataset.alarm)||50;
+  loadData();
+}
+
+// Range selection
+document.querySelectorAll('.range-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.range-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentHours = parseInt(btn.dataset.hours);
+    var lbl = currentHours < 24 ? currentHours+'h gần nhất' : currentHours===24 ? '24h gần nhất' : '7 ngày qua';
+    document.getElementById('co-range-lbl').textContent = lbl;
+    document.getElementById('spd-range-lbl').textContent = lbl;
+    loadData();
+  });
+});
+
+function loadData() {
+  setLoading(true);
+  fetch('/dashboard/api/units/'+currentUid+'/history/?hours='+currentHours)
+    .then(function(r){ return r.json(); })
+    .then(function(d){ renderData(d.data||[]); setLoading(false); })
+    .catch(function(){ setLoading(false); showNoData(); });
+}
+
+function setLoading(v) {
+  if(v) {
+    document.getElementById('co-chart-body').innerHTML  = '<div class="loading-msg">Đang tải…</div>';
+    document.getElementById('spd-chart-body').innerHTML = '<div class="loading-msg">Đang tải…</div>';
+  }
+}
+
+function showNoData() {
+  var msg = '<div class="no-data-msg">Chưa có dữ liệu trong khoảng thời gian này</div>';
+  document.getElementById('co-chart-body').innerHTML  = msg;
+  document.getElementById('spd-chart-body').innerHTML = msg;
+}
+
+function renderData(pts) {
+  if(!pts.length){ showNoData(); updatePills([]); return; }
+  updatePills(pts);
+  renderLineChart('co-chart-body',  pts, 'co',    currentWarn, currentAlarm, 'co');
+  renderLineChart('spd-chart-body', pts, 'speed', 0, 0, 'spd');
+}
+
+function updatePills(pts) {
+  if(!pts.length) {
+    ['sp-avg-co','sp-max-co','sp-avg-spd','sp-trips','sp-records'].forEach(function(id){ document.getElementById(id).textContent='—'; });
+    return;
+  }
+  var coArr  = pts.map(function(p){ return p.co; });
+  var spdArr = pts.map(function(p){ return p.speed; });
+  var trips  = pts.filter(function(p){ return p.tripped; }).length;
+  var avgCO  = coArr.reduce(function(a,b){ return a+b; }, 0) / coArr.length;
+  var maxCO  = Math.max.apply(null, coArr);
+  var avgSpd = spdArr.reduce(function(a,b){ return a+b; }, 0) / spdArr.length;
+  document.getElementById('sp-avg-co').textContent  = avgCO.toFixed(1);
+  document.getElementById('sp-max-co').textContent  = maxCO.toFixed(1);
+  document.getElementById('sp-avg-spd').textContent = avgSpd.toFixed(0);
+  document.getElementById('sp-trips').textContent   = trips;
+  document.getElementById('sp-records').textContent = pts.length;
+
+  // Color pills
+  document.getElementById('sp-max-co').style.color = maxCO >= currentAlarm ? 'var(--red)' : maxCO >= currentWarn ? 'var(--amber)' : '';
+  document.getElementById('sp-trips').style.color  = trips > 0 ? 'var(--red)' : '';
+}
+
+function renderLineChart(containerId, pts, field, warnVal, alarmVal, type) {
+  var W=800, H=160, padL=42, padR=12, padT=12, padB=30;
+  var cW = W-padL-padR, cH = H-padT-padB;
+  var isGreen = type==='spd';
+
+  var vals = pts.map(function(p){ return p[field]; });
+  var minV = 0;
+  var maxV = Math.max.apply(null, vals);
+  if(type==='co')  maxV = Math.max(maxV, alarmVal, 10);
+  if(type==='spd') maxV = 100;
+  if(maxV === 0)   maxV = 10;
+
+  // Parse times for X axis
+  var times = pts.map(function(p){ return new Date(p.ts).getTime(); });
+  var minT  = times[0], maxT = times[times.length-1];
+  var tRange = maxT - minT || 1;
+
+  function sx(t)  { return padL + ((t-minT)/tRange)*cW; }
+  function sy(v)  { return padT + (1 - (v-minV)/(maxV-minV))*cH; }
+
+  // Y-axis grid
+  var grid = '';
+  var ySteps = 4;
+  for(var i=0;i<=ySteps;i++){
+    var frac = i/ySteps;
+    var yv = minV + frac*(maxV-minV);
+    var yy = padT + (1-frac)*cH;
+    grid += '<line class="lc-grid" x1="'+padL+'" y1="'+yy+'" x2="'+(W-padR)+'" y2="'+yy+'"/>';
+    grid += '<text class="lc-lbl" x="'+(padL-4)+'" y="'+(yy+4)+'" text-anchor="end">'+yv.toFixed(yv<10?1:0)+'</text>';
+  }
+  // X-axis labels (5 ticks)
+  for(var j=0;j<=4;j++){
+    var t = minT + (j/4)*tRange;
+    var d = new Date(t);
+    var xL = (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();
+    var xx = sx(t);
+    grid += '<line class="lc-axis" x1="'+xx+'" y1="'+padT+'" x2="'+xx+'" y2="'+(H-padB)+'"/>';
+    grid += '<text class="lc-lbl" x="'+xx+'" y="'+(H-padB+14)+'" text-anchor="middle">'+xL+'</text>';
+  }
+  // Threshold lines for CO
+  if(type==='co' && warnVal>0){
+    grid += '<line class="lc-warn" x1="'+padL+'" y1="'+sy(warnVal)+'" x2="'+(W-padR)+'" y2="'+sy(warnVal)+'"/>';
+    grid += '<text class="lc-lbl" x="'+(W-padR)+'" y="'+(sy(warnVal)-2)+'" text-anchor="end" fill="rgba(251,191,36,.6)">warn '+warnVal+'</text>';
+    grid += '<line class="lc-alarm" x1="'+padL+'" y1="'+sy(alarmVal)+'" x2="'+(W-padR)+'" y2="'+sy(alarmVal)+'"/>';
+    grid += '<text class="lc-lbl" x="'+(W-padR)+'" y="'+(sy(alarmVal)-2)+'" text-anchor="end" fill="rgba(248,113,113,.6)">alarm '+alarmVal+'</text>';
+  }
+
+  // Path
+  var lineClass = isGreen ? 'lc-line-spd' : 'lc-line-co';
+  var areaClass = isGreen ? 'lc-area-spd' : 'lc-area-co';
+  var pathD = pts.map(function(p,i){
+    return (i===0?'M':'L')+sx(times[i]).toFixed(1)+','+sy(p[field]).toFixed(1);
+  }).join(' ');
+  var areaD = pathD + ' L'+sx(times[times.length-1]).toFixed(1)+','+(H-padB)+' L'+padL+','+(H-padB)+' Z';
+
+  // Trip markers
+  var tripMarkers = '';
+  if(type==='co'){
+    pts.forEach(function(p,i){
+      if(p.tripped){
+        tripMarkers += '<circle class="lc-trip" cx="'+sx(times[i]).toFixed(1)+'" cy="'+sy(p[field]).toFixed(1)+'" r="4" opacity=".85"/>';
+      }
+    });
+  }
+
+  var svgHtml = '<svg class="linechart" viewBox="0 0 '+W+' '+H+'" aria-hidden="true">'
+    + '<g>' + grid + '</g>'
+    + '<path class="'+areaClass+'" d="'+areaD+'"/>'
+    + '<path class="'+lineClass+'" d="'+pathD+'"/>'
+    + tripMarkers
+    + '</svg>';
+
+  document.getElementById(containerId).innerHTML = svgHtml;
+}
+
+// Initial load
+loadData();
+// Auto-refresh every 30s
+setInterval(loadData, 30000);
+</script>
+{% endif %}
+{% endblock %}

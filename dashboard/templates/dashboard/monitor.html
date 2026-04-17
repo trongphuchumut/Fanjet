@@ -1,0 +1,291 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Giám sát MQTT{% endblock %}
+{% block page_title %}Giám sát MQTT{% endblock %}
+
+{% block extra_head %}
+<style>
+  #page-content { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .monitor-wrap { flex: 1; display: flex; flex-direction: column; height: calc(100vh - 56px); overflow: hidden; }
+
+  /* Header bar */
+  .mon-head {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+  .mon-conn-badge {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 12px; border-radius: 99px; font-size: 12px; font-weight: 700;
+    border: 1px solid;
+  }
+  .mon-conn-badge.connected    { background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.28); color: var(--green); }
+  .mon-conn-badge.disconnected { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.28); color: var(--red); }
+  .mon-conn-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .mon-conn-badge.connected .dot { animation: pulse-g 2s ease-in-out infinite; }
+
+  .mon-broker { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--txt-2); }
+
+  .mon-actions { margin-left: auto; display: flex; gap: 6px; }
+  .mon-btn {
+    padding: 5px 12px; border-radius: 7px; border: 1px solid var(--border);
+    background: none; color: var(--txt-2); font-family: inherit;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all .2s;
+  }
+  .mon-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .mon-btn:hover { background: var(--bg-hover); color: var(--txt); }
+  .mon-btn.active { background: var(--bg-active); color: var(--txt-active); border-color: var(--cyan-dim); }
+
+  /* Filter chips */
+  .filter-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip {
+    padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: none; color: var(--txt-2); font-size: 11.5px; font-weight: 600;
+    cursor: pointer; font-family: 'JetBrains Mono', monospace;
+    transition: all .15s;
+  }
+  .chip.active { background: var(--bg-active); color: var(--txt-active); border-color: var(--cyan-dim); }
+  .chip:hover  { background: var(--bg-hover); color: var(--txt); }
+
+  /* Message log */
+  .msg-log {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .log-row {
+    display: grid;
+    grid-template-columns: 80px 180px 1fr auto;
+    gap: 0;
+    padding: 6px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    align-items: center;
+    transition: background .1s;
+    animation: fadeRow .25s ease both;
+  }
+  @keyframes fadeRow { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  .log-row:hover { background: var(--bg-hover); }
+
+  .log-time { color: var(--txt-3); font-size: 11px; }
+  .log-topic { color: var(--cyan); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; }
+  .log-payload { color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; }
+  .log-dir {
+    font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;
+    white-space: nowrap;
+  }
+  .log-dir.sub { background: rgba(56,189,248,.12); color: var(--cyan); }
+  .log-dir.pub { background: rgba(74,222,128,.12); color: var(--green); }
+  .log-dir.sys { background: rgba(251,191,36,.12); color: var(--amber); }
+
+  /* Highlight by type */
+  .log-row.fault { background: rgba(248,113,113,.04); }
+  .log-row.fault .log-payload { color: var(--red); }
+
+  /* Input bar */
+  .pub-bar {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+  }
+  .pub-topic {
+    flex: 0 0 220px;
+    height: 38px; padding: 0 10px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    outline: none; transition: border-color .2s;
+  }
+  .pub-topic:focus { border-color: var(--cyan); }
+  .pub-payload {
+    flex: 1; height: 38px; padding: 0 10px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    outline: none; transition: border-color .2s;
+  }
+  .pub-payload:focus { border-color: var(--green); }
+  .btn-publish {
+    height: 38px; padding: 0 16px; border-radius: 8px; border: none;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #fff; font-family: inherit; font-size: 13px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 2px 10px rgba(5,150,105,.3);
+    display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+    transition: opacity .2s, transform .2s;
+  }
+  .btn-publish:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-publish svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; }
+  @media (max-width: 600px) { .pub-topic { flex: 0 0 140px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="monitor-wrap">
+
+  <!-- Header -->
+  <div class="mon-head">
+    <div class="mon-conn-badge {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}connected{% else %}disconnected{% endif %}" id="conn-badge">
+      <span class="dot"></span>
+      {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}Đã kết nối{% else %}Chưa kết nối{% endif %}
+    </div>
+    <span class="mon-broker">
+      {% if mqtt_config %}{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }}{% else %}Chưa cấu hình broker{% endif %}
+    </span>
+
+    <div class="filter-chips">
+      <button class="chip active" data-f="all">Tất cả</button>
+      <button class="chip" data-f="status">/status</button>
+      <button class="chip" data-f="data">/data</button>
+      <button class="chip" data-f="command">/command</button>
+      <button class="chip" data-f="fault">fault</button>
+    </div>
+
+    <div class="mon-actions">
+      <button class="mon-btn active" id="btn-autoscroll">
+        <svg viewBox="0 0 24 24"><polyline points="7,13 12,18 17,13"/><polyline points="7,6 12,11 17,6"/></svg>
+        Auto-scroll
+      </button>
+      <button class="mon-btn" id="btn-pause">
+        <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        Pause
+      </button>
+      <button class="mon-btn" id="btn-clear">
+        <svg viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        Xóa
+      </button>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="msg-log" id="msg-log" aria-live="polite" aria-label="Nhật ký MQTT">
+    <div class="log-row" style="border-bottom:1px solid var(--border-strong);padding-top:8px;padding-bottom:8px">
+      <span class="log-time" style="font-weight:700;color:var(--txt-2)">Giờ</span>
+      <span class="log-topic" style="font-weight:700;color:var(--txt-2)">Topic</span>
+      <span class="log-payload" style="font-weight:700;color:var(--txt-2)">Payload</span>
+      <span class="log-dir" style="background:none;color:var(--txt-2)">Hướng</span>
+    </div>
+  </div>
+
+  <!-- Publish bar -->
+  <div class="pub-bar">
+    <input type="text" class="pub-topic"   id="pub-topic"   placeholder="topic/path" value="{{ mqtt_config.topic_prefix|default:'fanjet/basement' }}/F01/command" />
+    <input type="text" class="pub-payload" id="pub-payload" placeholder='{"cmd":"ON"}' />
+    <button class="btn-publish" id="btn-publish">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+      Gửi (Publish)
+    </button>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function(){
+  var log       = document.getElementById('msg-log');
+  var paused    = false;
+  var autoScroll= true;
+  var filter    = 'all';
+  var PREFIX    = '{{ mqtt_config.topic_prefix|default:"fanjet/basement" }}';
+
+  var DEMO_MSGS = [
+    { topic: PREFIX+'/F01/status', payload: '{"status":"running","rpm":1450}', dir:'sub' },
+    { topic: PREFIX+'/F02/data',   payload: '{"temp":29.1,"power":115,"humidity":62}', dir:'sub' },
+    { topic: PREFIX+'/F05/status', payload: '{"status":"running","rpm":1500}', dir:'sub' },
+    { topic: PREFIX+'/F01/data',   payload: '{"temp":28.5,"power":120,"humidity":58}', dir:'sub' },
+    { topic: PREFIX+'/F04/status', payload: '{"status":"fault","code":"OVT","temp":34.2}', dir:'sub', fault:true },
+    { topic: PREFIX+'/all/command',payload: 'ON', dir:'pub' },
+    { topic: PREFIX+'/F06/data',   payload: '{"temp":30.2,"power":118,"humidity":65}', dir:'sub' },
+    { topic: PREFIX+'/F03/status', payload: '{"status":"off"}', dir:'sub' },
+    { topic: PREFIX+'/F07/data',   payload: '{"temp":28.9,"power":116,"humidity":60}', dir:'sub' },
+    { topic: PREFIX+'/F04/status', payload: '{"status":"fault","code":"OVT"}', dir:'sub', fault:true },
+    { topic: '$SYS/broker/clients/connected', payload: '8', dir:'sys' },
+    { topic: PREFIX+'/F08/data',   payload: '{"temp":29.5,"power":122,"humidity":61}', dir:'sub' },
+  ];
+  var msgIdx = 0;
+
+  function now() {
+    return new Date().toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+
+  function matchFilter(row) {
+    if(filter==='all') return true;
+    if(filter==='fault') return row.fault;
+    if(filter==='status')  return row.topic.includes('/status');
+    if(filter==='data')    return row.topic.includes('/data');
+    if(filter==='command') return row.topic.includes('/command');
+    return true;
+  }
+
+  function addRow(msg) {
+    if(!matchFilter(msg)) return;
+    var row = document.createElement('div');
+    row.className = 'log-row' + (msg.fault ? ' fault' : '');
+    row.innerHTML =
+      '<span class="log-time">'+now()+'</span>'+
+      '<span class="log-topic" title="'+msg.topic+'">'+msg.topic+'</span>'+
+      '<span class="log-payload" title="'+msg.payload+'">'+msg.payload+'</span>'+
+      '<span class="log-dir '+msg.dir+'">'+msg.dir.toUpperCase()+'</span>';
+    log.appendChild(row);
+    if(autoScroll) log.scrollTop = log.scrollHeight;
+  }
+
+  /* Auto-feed demo messages */
+  function nextMsg() {
+    if(!paused) addRow(DEMO_MSGS[msgIdx % DEMO_MSGS.length]);
+    msgIdx++;
+  }
+  var timer = setInterval(nextMsg, 900);
+  /* Burst first 4 messages */
+  for(var i=0;i<4;i++) addRow(DEMO_MSGS[i]);
+
+  /* Filter chips */
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.addEventListener('click', function(){
+      document.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('active'); });
+      c.classList.add('active');
+      filter = c.dataset.f;
+    });
+  });
+
+  /* Controls */
+  document.getElementById('btn-pause').addEventListener('click', function(){
+    paused = !paused;
+    this.classList.toggle('active', paused);
+    this.querySelector('svg').innerHTML = paused
+      ? '<polygon points="5,3 19,12 5,21"/>'
+      : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  });
+
+  document.getElementById('btn-autoscroll').addEventListener('click', function(){
+    autoScroll = !autoScroll;
+    this.classList.toggle('active', autoScroll);
+  });
+
+  document.getElementById('btn-clear').addEventListener('click', function(){
+    var header = log.firstChild;
+    log.innerHTML = '';
+    log.appendChild(header);
+  });
+
+  /* Publish */
+  document.getElementById('btn-publish').addEventListener('click', function(){
+    var topic   = document.getElementById('pub-topic').value.trim();
+    var payload = document.getElementById('pub-payload').value.trim();
+    if(!topic||!payload) return;
+    addRow({topic:topic, payload:payload, dir:'pub'});
+    document.getElementById('pub-payload').value='';
+  });
+  document.getElementById('pub-payload').addEventListener('keydown', function(e){
+    if(e.key==='Enter') document.getElementById('btn-publish').click();
+  });
+})();
+</script>
+{% endblock %}

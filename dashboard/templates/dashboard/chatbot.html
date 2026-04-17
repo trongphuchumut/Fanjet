@@ -1,0 +1,304 @@
+{% extends "dashboard/base.html" %}
+{% block title %}AI Chatbot{% endblock %}
+{% block page_title %}AI Chatbot – FanJet{% endblock %}
+
+{% block extra_head %}
+<style>
+  #page-content { padding:0; display:flex; flex-direction:column; overflow:hidden; }
+  .chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 56px); overflow:hidden; }
+
+  /* Top bar */
+  .chat-topbar { display:flex; align-items:center; gap:10px; padding:10px 16px;
+                 border-bottom:1px solid var(--border); background:var(--bg-surface); flex-shrink:0; flex-wrap:wrap; }
+  .model-select { height:34px; padding:0 10px; background:var(--bg); border:1px solid var(--border-strong);
+                  border-radius:8px; color:var(--txt); font-family:'JetBrains Mono',monospace; font-size:12.5px;
+                  outline:none; cursor:pointer; min-width:180px; }
+  .ollama-status { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--txt-2); }
+  .ollama-dot { width:7px; height:7px; border-radius:50%; }
+  .ollama-dot.ok  { background:var(--green); animation:pulse-g 2s ease-in-out infinite; }
+  .ollama-dot.err { background:var(--red); }
+  @keyframes pulse-g { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .chat-clear { margin-left:auto; padding:5px 12px; border-radius:7px; border:1px solid var(--border);
+                background:none; color:var(--txt-2); font-family:inherit; font-size:12px; font-weight:600;
+                cursor:pointer; transition:background .15s; }
+  .chat-clear:hover { background:var(--bg-hover); color:var(--txt); }
+
+  /* Suggestions */
+  .sug-bar { padding:8px 16px; display:flex; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--border); background:rgba(0,0,0,.08); flex-shrink:0; }
+  .sug { padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:none; color:var(--txt-2);
+         font-size:12px; font-family:inherit; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .sug:hover { background:var(--bg-hover); color:var(--txt); border-color:var(--border-strong); }
+
+  /* Messages */
+  .chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .msg { display:flex; gap:10px; animation:fadeIn .25s ease; max-width:85%; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+  .msg.user  { align-self:flex-end; flex-direction:row-reverse; }
+  .msg.bot   { align-self:flex-start; }
+  .msg-avatar { width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+                justify-content:center; flex-shrink:0; font-size:11px; font-weight:800; }
+  .msg.user .msg-avatar  { background:linear-gradient(135deg,#0ea5e9,#7c3aed); color:#fff; }
+  .msg.bot  .msg-avatar  { background:var(--bg-raised); border:1px solid var(--border); }
+  .msg.bot  .msg-avatar svg { width:14px; height:14px; stroke:var(--cyan); fill:none; stroke-width:2; }
+  .msg-bubble { padding:10px 14px; border-radius:12px; font-size:13.5px; line-height:1.6; }
+  .msg.user .msg-bubble { background:linear-gradient(135deg,rgba(14,165,233,.25),rgba(124,58,237,.2));
+                          border:1px solid rgba(56,189,248,.2); border-bottom-right-radius:4px; }
+  .msg.bot  .msg-bubble { background:var(--bg-surface); border:1px solid var(--border); border-bottom-left-radius:4px; }
+  .msg.bot  .msg-bubble pre { background:var(--bg-raised); border-radius:7px; padding:10px; overflow-x:auto; margin-top:6px; font-size:12px; }
+  .msg.bot  .msg-bubble code { background:var(--bg-raised); padding:1px 5px; border-radius:4px; font-size:12.5px; font-family:'JetBrains Mono',monospace; }
+
+  /* Typing indicator */
+  .typing { display:flex; align-items:center; gap:5px; padding:12px 14px; }
+  .typing span { width:6px; height:6px; border-radius:50%; background:var(--txt-3); animation:bounce .8s ease-in-out infinite; }
+  .typing span:nth-child(2) { animation-delay:.15s; }
+  .typing span:nth-child(3) { animation-delay:.30s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+
+  /* Input bar */
+  .chat-input-bar { border-top:1px solid var(--border); background:var(--bg-surface); padding:10px 16px;
+                    display:flex; gap:8px; align-items:flex-end; flex-shrink:0; }
+  .chat-textarea { flex:1; resize:none; background:var(--bg); border:1px solid var(--border-strong);
+                   border-radius:10px; padding:10px 14px; color:var(--txt); font-family:inherit;
+                   font-size:13.5px; outline:none; max-height:120px; line-height:1.5;
+                   transition:border-color .15s; min-height:42px; }
+  .chat-textarea:focus { border-color:var(--cyan); }
+  .chat-send { width:42px; height:42px; border-radius:10px; border:none; flex-shrink:0;
+               background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; cursor:pointer;
+               display:flex; align-items:center; justify-content:center;
+               box-shadow:0 2px 10px rgba(14,165,233,.3); transition:opacity .15s,transform .15s; }
+  .chat-send:hover { opacity:.88; transform:scale(1.04); }
+  .chat-send:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+  .chat-send svg { width:16px; height:16px; stroke:#fff; fill:none; stroke-width:2.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-wrap">
+
+  <!-- Top bar: model selector + status -->
+  <div class="chat-topbar">
+    <div class="ollama-status">
+      <span class="ollama-dot {% if ollama_models %}ok{% else %}err{% endif %}" id="ollama-dot"></span>
+      <span id="ollama-status-txt">{% if ollama_models %}Ollama đã kết nối{% else %}Không kết nối Ollama{% endif %}</span>
+    </div>
+    <select class="model-select" id="model-select">
+      {% if ollama_models %}
+        {% for m in ollama_models %}
+        <option value="{{ m }}" {% if m == ollama.default_model %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      {% else %}
+        <option value="{{ ollama.default_model }}">{{ ollama.default_model }} (offline)</option>
+      {% endif %}
+    </select>
+    <button class="chat-clear" onclick="clearChat()">Xóa lịch sử</button>
+  </div>
+
+  <!-- Suggestions -->
+  <div class="sug-bar">
+    <button class="sug" onclick="sendSug(this)">Tổng quan hệ thống quạt hiện tại</button>
+    <button class="sug" onclick="sendSug(this)">Quạt nào đang có CO cao nhất?</button>
+    <button class="sug" onclick="sendSug(this)">Có quạt nào đang trip không?</button>
+    <button class="sug" onclick="sendSug(this)">Đánh giá khả năng hoạt động hệ thống</button>
+    <button class="sug" onclick="sendSug(this)">Tôi nên điều chỉnh tốc độ quạt như thế nào?</button>
+  </div>
+
+  <!-- Messages -->
+  <div class="chat-messages" id="chat-messages">
+    <!-- Welcome message -->
+    <div class="msg bot" id="welcome-msg">
+      <div class="msg-avatar">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <div class="msg-bubble">
+        <strong>FanJet AI</strong> – Xin chào! Tôi có thể giúp bạn:<br>
+        • Kiểm tra trạng thái các bộ quạt<br>
+        • Phân tích nồng độ CO và tốc độ quạt<br>
+        • Đánh giá hiệu suất hoạt động hệ thống<br>
+        • Đưa ra khuyến nghị vận hành<br><br>
+        Model: <code>{{ ollama.default_model }}</code> | Ollama: <code>{{ ollama.host }}</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="chat-input-bar">
+    <textarea class="chat-textarea" id="chat-input" rows="1"
+              placeholder="Hỏi về hệ thống quạt…"
+              onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="chat-send" id="chat-send" onclick="sendMessage()" aria-label="Gửi">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+    </button>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+var chatHistory = [];   // [{role, content}]
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function scrollBottom() {
+  var el = document.getElementById('chat-messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+function addMsg(role, content) {
+  var msgs = document.getElementById('chat-messages');
+  var div  = document.createElement('div');
+  div.className = 'msg ' + (role==='user' ? 'user' : 'bot');
+  var avatar = role==='user'
+    ? '<div class="msg-avatar">{{ request.user.username|first|upper }}</div>'
+    : '<div class="msg-avatar"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>';
+  div.innerHTML = avatar + '<div class="msg-bubble">' + escHtml(content).replace(/\n/g,'<br>') + '</div>';
+  msgs.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addTyping() {
+  var msgs = document.getElementById('chat-messages');
+  var div  = document.createElement('div');
+  div.className = 'msg bot'; div.id = 'typing-indicator';
+  div.innerHTML = '<div class="msg-avatar"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>'
+                + '<div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  msgs.appendChild(div);
+  scrollBottom();
+}
+
+function removeTyping() {
+  var el = document.getElementById('typing-indicator');
+  if(el) el.remove();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sendMessage() {
+  var input = document.getElementById('chat-input');
+  var text  = input.value.trim();
+  if(!text) return;
+  input.value = ''; autoResize(input);
+
+  addMsg('user', text);
+  chatHistory.push({role:'user', content:text});
+
+  var model = document.getElementById('model-select').value;
+  var sendBtn = document.getElementById('chat-send');
+  sendBtn.disabled = true;
+  addTyping();
+
+  fetch('/dashboard/api/chat/', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},
+    body: JSON.stringify({model:model, messages:chatHistory})
+  }).then(async function(response){
+    removeTyping();
+    sendBtn.disabled = false;
+    
+    if(!response.ok) {
+      try {
+        var err = await response.json();
+        addMsg('assistant', '⚠ Lỗi: ' + (err.error||'Máy chủ gặp sự cố.'));
+      } catch(e) {
+        addMsg('assistant', '⚠ Lỗi máy chủ HTTP ' + response.status);
+      }
+      return;
+    }
+
+    var botMsgDiv = addMsg('assistant', '');
+    var contentDiv = botMsgDiv.querySelector('.msg-bubble');
+    var fullContent = '';
+    
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder('utf-8');
+    
+    while (true) {
+        var {done, value} = await reader.read();
+        if (done) break;
+        
+        var chunk = decoder.decode(value, {stream: true});
+        var lines = chunk.split('\n');
+        for (var line of lines) {
+            if (!line.trim()) continue;
+            try {
+                var json = JSON.parse(line);
+                if (json.message && json.message.content) {
+                    fullContent += json.message.content;
+                    contentDiv.innerHTML = escHtml(fullContent).replace(/\n/g,'<br>');
+                    scrollBottom();
+                }
+            } catch(e) {}
+        }
+    }
+    
+    chatHistory.push({role:'assistant', content:fullContent});
+    
+  }).catch(function(e){
+    removeTyping(); sendBtn.disabled = false;
+    addMsg('assistant', '⚠ Lỗi kết nối truy vấn: '+e.message);
+  });
+}
+
+function sendSug(btn) {
+  document.getElementById('chat-input').value = btn.textContent;
+  sendMessage();
+}
+
+function clearChat() {
+  chatHistory = [];
+  var msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = '';
+  // Re-add welcome
+  msgs.innerHTML = '<div class="msg bot"><div class="msg-avatar"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div><div class="msg-bubble">Lịch sử đã được xóa. Tôi có thể giúp gì cho bạn?</div></div>';
+}
+
+function onKey(e) {
+  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); }
+}
+
+function getCsrf(){ var m=document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)'); return m?m[2]:''; }
+
+// Refresh Ollama status + model list on load
+fetch('/dashboard/api/ollama/models/').then(function(r){return r.json();}).then(function(d){
+  var dot = document.getElementById('ollama-dot');
+  var txt = document.getElementById('ollama-status-txt');
+  var sel = document.getElementById('model-select');
+  
+  var cloudModels = [
+    'qwen3-coder:480b-cloud',
+    'deepseek-v3.1:671b-cloud',
+    'gpt-oss:120b-cloud',
+    'gpt-oss:20b-cloud',
+    'qwen3-vl:235b-cloud',
+    'minimax-m2:cloud',
+    'glm-4.6:cloud'
+  ];
+  
+  var allModels = [...cloudModels];
+  if(d.ok && d.models.length) {
+    d.models.forEach(function(m){ if(!allModels.includes(m)) allModels.push(m); });
+  }
+
+  if(allModels.length > 0) {
+    dot.className = d.ok ? 'ollama-dot ok' : 'ollama-dot err'; 
+    txt.textContent = d.ok ? 'Sẵn sàng' : 'Dùng Cloud Proxy (Ollama DB offline)';
+    var cur = sel.value;
+    sel.innerHTML = '';
+    allModels.forEach(function(m){
+      var opt = document.createElement('option');
+      opt.value = m; opt.textContent = m;
+      if(m===cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } else {
+    dot.className = 'ollama-dot err'; txt.textContent = 'API offline';
+  }
+});
+</script>
+{% endblock %}

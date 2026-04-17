@@ -1,0 +1,368 @@
+{% extends "dashboard/base.html" %}
+{% load auth_extras %}
+{% block title %}Tổng quan{% endblock %}
+{% block page_title %}Tổng quan hệ thống quạt{% endblock %}
+
+{% block extra_head %}
+<style>
+  .kpi-strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:12px; margin-bottom:20px; }
+  .kpi-card  { background:var(--bg-surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px;
+               display:flex; align-items:center; gap:12px; }
+  .kpi-icon  { width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .kpi-icon svg { width:17px; height:17px; stroke:#fff; fill:none; stroke-width:2; }
+  .kpi-val   { font-size:22px; font-weight:800; letter-spacing:-.5px; }
+  .kpi-lbl   { font-size:11px; color:var(--txt-2); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+
+  .toolbar   { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .zone-tabs { display:flex; gap:4px; }
+  .ztab      { padding:6px 14px; border-radius:8px; border:1px solid var(--border); background:none;
+               color:var(--txt-2); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;
+               transition:all .18s; }
+  .ztab.active { background:var(--bg-active); border-color:var(--cyan-dim); color:var(--txt-active); }
+  .ztab:hover  { background:var(--bg-hover); color:var(--txt); }
+
+  /* Unit card */
+  .unit-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+  .unit-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px;
+               transition:border-color .2s, box-shadow .2s, transform .2s; overflow:hidden; }
+  .unit-card:hover { box-shadow:0 8px 24px rgba(0,0,0,.3); transform:translateY(-2px); }
+  .unit-card.co-alarm   { border-color:rgba(248,113,113,.4); }
+  .unit-card.co-warning { border-color:rgba(251,191,36,.35); }
+  .unit-card.co-normal  { border-color:rgba(56,189,248,.2); }
+  .unit-card.offline    { border-color:var(--border); opacity:.7; }
+
+  /* Card head */
+  .uc-head { padding:12px 14px 8px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+  .uc-id   { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--txt-3); font-weight:600; }
+  .uc-name { font-size:14px; font-weight:700; margin-top:1px; }
+  .uc-loc  { font-size:11.5px; color:var(--txt-2); margin-top:1px; }
+  .mode-badge { padding:3px 9px; border-radius:99px; font-size:10.5px; font-weight:800;
+                letter-spacing:.4px; text-transform:uppercase; flex-shrink:0; }
+  .mode-badge.auto   { background:var(--cyan-dim); color:var(--cyan); border:1px solid rgba(56,189,248,.25); }
+  .mode-badge.manual { background:rgba(129,140,248,.15); color:var(--indigo); border:1px solid rgba(129,140,248,.25); }
+
+  /* CO meter */
+  .uc-co { padding:0 14px 10px; }
+  .co-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+  .co-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--txt-3); }
+  .co-val { font-size:15px; font-weight:800; letter-spacing:-.3px; }
+  .co-bar-wrap { height:6px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; }
+  .co-bar { height:100%; border-radius:99px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+  .co-bar.normal  { background:linear-gradient(90deg,#0ea5e9,#38bdf8); }
+  .co-bar.warning { background:linear-gradient(90deg,#d97706,#fbbf24); }
+  .co-bar.alarm   { background:linear-gradient(90deg,#dc2626,#f87171); animation:pulse-r 1.5s ease-in-out infinite; }
+  @keyframes pulse-r { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .co-status-txt { font-size:10.5px; font-weight:700; margin-top:4px; }
+  .co-status-txt.normal  { color:var(--cyan); }
+  .co-status-txt.warning { color:var(--amber); }
+  .co-status-txt.alarm   { color:var(--red); }
+  .co-status-txt.unknown { color:var(--txt-3); }
+
+  /* Fan visual + speed */
+  .uc-mid { display:flex; align-items:center; justify-content:space-around; padding:6px 14px 10px; }
+  .fan-anim-wrap { width:72px; height:72px; border-radius:50%; display:flex; align-items:center; justify-content:center; position:relative; }
+  .fan-anim-wrap.running { background:radial-gradient(circle,rgba(56,189,248,.12),transparent 70%); }
+  .fan-anim-wrap.off     { background:radial-gradient(circle,rgba(148,163,184,.06),transparent 70%); }
+  .fan-anim-wrap.trip    { background:radial-gradient(circle,rgba(248,113,113,.12),transparent 70%); }
+  .fan-svg { width:60px; height:60px; }
+  .fan-blades { transform-origin:30px 30px; }
+  .running .fan-blades { animation:spin 1.2s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .speed-info { text-align:center; }
+  .speed-num  { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .speed-unit { font-size:11px; color:var(--txt-2); font-weight:600; }
+  .speed-bar-wrap { width:64px; height:5px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; margin:5px auto 0; }
+  .speed-bar { height:100%; background:linear-gradient(90deg,#0ea5e9,#4ade80); border-radius:99px; transition:width .5s; }
+
+  /* Trip badge */
+  .trip-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px;
+                font-size:10.5px; font-weight:800; background:var(--red-dim); color:var(--red);
+                border:1px solid rgba(248,113,113,.28); animation:pulse-r 1.5s ease-in-out infinite; }
+  .trip-badge svg { width:10px; height:10px; stroke:currentColor; fill:none; stroke-width:2.5; }
+
+  /* Card footer – controls */
+  .uc-foot { padding:10px 14px; border-top:1px solid var(--border); background:rgba(0,0,0,.15);
+             display:flex; flex-direction:column; gap:8px; }
+  .mode-row { display:flex; align-items:center; gap:6px; }
+  .ml { font-size:11.5px; color:var(--txt-2); flex:1; }
+  .mbtn { padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:none;
+          color:var(--txt-2); font-family:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
+          transition:all .15s; }
+  .mbtn.active { border-color:var(--cyan-dim); background:var(--bg-active); color:var(--txt-active); }
+  .mbtn:hover  { background:var(--bg-hover); color:var(--txt); }
+
+  .manual-row { display:flex; align-items:center; gap:8px; }
+  .speed-slider { flex:1; -webkit-appearance:none; height:4px; border-radius:99px;
+                  background:rgba(255,255,255,.1); outline:none; cursor:pointer; }
+  .speed-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px;
+    border-radius:50%; background:var(--cyan); cursor:pointer; box-shadow:0 0 0 3px var(--cyan-glow); }
+  .speed-display { font-size:12px; font-weight:700; color:var(--cyan); width:36px; text-align:right; flex-shrink:0; }
+
+  .send-btn { width:100%; padding:7px; border-radius:8px; border:none;
+              background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff;
+              font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+              transition:opacity .15s, transform .15s; }
+  .send-btn:hover { opacity:.88; transform:translateY(-1px); }
+  .send-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+  .unit-empty { grid-column:1/-1; text-align:center; padding:60px 20px; }
+  .unit-empty a { color:var(--cyan); text-decoration:none; font-weight:600; }
+  .unit-empty a:hover { text-decoration:underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI strip -->
+<div class="kpi-strip" role="region" aria-label="Tổng quan">
+  <div class="kpi-card">
+    <div class="kpi-icon" style="background:rgba(56,189,248,.18)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" fill="white"/><ellipse cx="12" cy="6" rx="4" ry="6" fill="white" opacity=".7"/><ellipse cx="12" cy="6" rx="4" ry="6" fill="white" opacity=".7" transform="rotate(120 12 12)"/><ellipse cx="12" cy="6" rx="4" ry="6" fill="white" opacity=".7" transform="rotate(240 12 12)"/></svg>
+    </div>
+    <div><div class="kpi-val">{{ total_fans }}</div><div class="kpi-lbl">Tổng bộ quạt</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon" style="background:rgba(74,222,128,.15)">
+      <svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+    </div>
+    <div><div class="kpi-val" style="color:var(--green)">{{ running }}</div><div class="kpi-lbl">Đang chạy</div></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon" style="background:rgba(248,113,113,.15)">
+      <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div><div class="kpi-val" style="color:var(--red)">{{ faults }}</div><div class="kpi-lbl">Trip / Lỗi</div></div>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="zone-tabs" role="group" aria-label="Lọc khu vực">
+    <button class="ztab active" data-zone="all">Tất cả</button>
+    <button class="ztab" data-zone="B1">Tầng B1</button>
+    <button class="ztab" data-zone="B2">Tầng B2</button>
+  </div>
+</div>
+
+<!-- Fan unit grid -->
+<div class="unit-grid" id="unit-grid">
+  {% for unit in units %}
+  {% with cos=unit.co_status online=unit.is_online %}
+  <div class="unit-card co-{{ cos }}{% if not online %} offline{% endif %}"
+       data-zone="{{ unit.zone }}" data-uid="{{ unit.unit_id }}" id="card-{{ unit.unit_id }}">
+
+    <!-- Head -->
+    <div class="uc-head">
+      <div>
+        <div class="uc-id">{{ unit.unit_id }} · {{ unit.zone }}</div>
+        <div class="uc-name">{{ unit.name }}</div>
+        {% if unit.location %}<div class="uc-loc">{{ unit.location }}</div>{% endif %}
+      </div>
+      <span class="mode-badge {{ unit.control_mode }}" id="mb-{{ unit.unit_id }}">
+        {{ unit.get_control_mode_display }}
+      </span>
+    </div>
+
+    <!-- CO meter -->
+    <div class="uc-co">
+      <div class="co-row">
+        <span class="co-lbl">Nồng độ CO</span>
+        <span class="co-val" id="co-val-{{ unit.unit_id }}">
+          {% if unit.last_co_ppm is not None %}{{ unit.last_co_ppm|floatformat:1 }} ppm{% else %}— ppm{% endif %}
+        </span>
+      </div>
+      {% with max=unit.co_alarm_ppm %}
+      <div class="co-bar-wrap">
+        <div class="co-bar {{ cos }}" id="co-bar-{{ unit.unit_id }}"
+             style="width:{% if unit.last_co_ppm is not None %}{% widthratio unit.last_co_ppm max 100 %}{% else %}0{% endif %}%"></div>
+      </div>
+      {% endwith %}
+      <div class="co-status-txt {{ cos }}" id="co-st-{{ unit.unit_id }}">
+        {% if cos == 'alarm' %}⚠ Báo động CO!
+        {% elif cos == 'warning' %}⚡ Cảnh báo CO
+        {% elif cos == 'normal' %}✓ CO bình thường
+        {% else %}Chưa có dữ liệu{% endif %}
+      </div>
+    </div>
+
+    <!-- Fan visual + speed -->
+    <div class="uc-mid">
+      <div class="fan-anim-wrap {% if unit.last_speed_pct and unit.last_speed_pct > 0 %}running
+                                {% elif unit.last_tripped %}trip{% else %}off{% endif %}"
+           id="fanwrap-{{ unit.unit_id }}">
+        <svg class="fan-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <g class="fan-blades" id="fanblades-{{ unit.unit_id }}"
+             style="color:{% if unit.last_tripped %}#f87171{% elif unit.last_speed_pct and unit.last_speed_pct > 0 %}#38bdf8{% else %}#475569{% endif %}">
+            <ellipse cx="30" cy="14" rx="6" ry="14" fill="currentColor" opacity=".85"/>
+            <ellipse cx="30" cy="14" rx="6" ry="14" fill="currentColor" opacity=".85" transform="rotate(120 30 30)"/>
+            <ellipse cx="30" cy="14" rx="6" ry="14" fill="currentColor" opacity=".85" transform="rotate(240 30 30)"/>
+            <circle cx="30" cy="30" r="5" fill="currentColor"/>
+            <circle cx="30" cy="30" r="2.5" fill="rgba(255,255,255,0.4)"/>
+          </g>
+        </svg>
+      </div>
+      <div class="speed-info">
+        {% if unit.last_tripped %}
+        <div class="trip-badge"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> TRIP</div>
+        {% else %}
+        <div class="speed-num" id="spd-val-{{ unit.unit_id }}">{{ unit.last_speed_pct|default:"0" }}<span style="font-size:13px;font-weight:500;color:var(--txt-2)">%</span></div>
+        <div class="speed-unit">Tốc độ</div>
+        <div class="speed-bar-wrap">
+          <div class="speed-bar" id="spd-bar-{{ unit.unit_id }}" style="width:{{ unit.last_speed_pct|default:0 }}%"></div>
+        </div>
+        {% endif %}
+        {% if not online %}<div style="font-size:10px;color:var(--txt-3);margin-top:4px">● Offline</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Controls -->
+    {% if request.user|has_role:'Admin,Operator' %}
+    <div class="uc-foot">
+      <div class="mode-row">
+        <span class="ml">Chế độ:</span>
+        <button class="mbtn {% if unit.control_mode == 'auto' %}active{% endif %}"
+                onclick="setMode('{{ unit.unit_id }}','auto',this)" id="btn-auto-{{ unit.unit_id }}">AUTO</button>
+        <button class="mbtn {% if unit.control_mode == 'manual' %}active{% endif %}"
+                onclick="setMode('{{ unit.unit_id }}','manual',this)" id="btn-manual-{{ unit.unit_id }}">MANUAL</button>
+      </div>
+
+      <div class="manual-row" id="manrow-{{ unit.unit_id }}"
+           style="{% if unit.control_mode != 'manual' %}display:none{% endif %}">
+        <input type="range" class="speed-slider" min="0" max="100" step="1"
+               value="{{ unit.manual_speed }}"
+               oninput="document.getElementById('sdisp-{{ unit.unit_id }}').textContent=this.value+'%'"
+               id="slider-{{ unit.unit_id }}" />
+        <span class="speed-display" id="sdisp-{{ unit.unit_id }}">{{ unit.manual_speed }}%</span>
+      </div>
+      <button class="send-btn {% if unit.control_mode != 'manual' %}send-btn-hidden{% endif %}"
+              id="sendbtn-{{ unit.unit_id }}"
+              style="{% if unit.control_mode != 'manual' %}display:none{% endif %}"
+              onclick="sendCommand('{{ unit.unit_id }}')">Gửi lệnh ↗</button>
+
+      <a href="{% url 'dashboard:unit_detail' unit.unit_id %}"
+         style="font-size:11.5px;color:var(--txt-3);text-decoration:none;text-align:center;display:block;margin-top:2px;">
+        Cấu hình chi tiết →
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endwith %}
+  {% empty %}
+  <div class="unit-empty">
+    <div style="font-size:36px;margin-bottom:10px">🌀</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Chưa có bộ quạt nào</div>
+    <div style="color:var(--txt-2);margin-bottom:16px">Hãy thêm bộ quạt đầu tiên để bắt đầu quản lý</div>
+    <a href="{% url 'dashboard:unit_add' %}">+ Thêm bộ quạt đầu tiên</a>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+var UNIT_DATA = {};
+{% for unit in units %}
+UNIT_DATA['{{ unit.unit_id }}'] = {
+  co_warn:  {{ unit.co_warn_ppm }},
+  co_alarm: {{ unit.co_alarm_ppm }},
+};
+{% endfor %}
+
+function setMode(uid, mode, btn) {
+  document.getElementById('btn-auto-'+uid).classList.toggle('active', mode==='auto');
+  document.getElementById('btn-manual-'+uid).classList.toggle('active', mode==='manual');
+  document.getElementById('manrow-'+uid).style.display = mode==='manual' ? 'flex' : 'none';
+  document.getElementById('sendbtn-'+uid).style.display = mode==='manual' ? 'block' : 'none';
+  document.getElementById('mb-'+uid).textContent = mode==='auto' ? 'Tự động' : 'Thủ công';
+  document.getElementById('mb-'+uid).className = 'mode-badge '+mode;
+  // Update DB + publish MQTT in background
+  var speed = mode==='manual' ? parseInt(document.getElementById('slider-'+uid).value||0) : null;
+  fetch('/dashboard/api/units/'+uid+'/command/', {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({mode:mode, speed: speed !== null ? speed : 0})
+  });
+}
+
+function sendCommand(uid) {
+  var speed = parseInt(document.getElementById('slider-'+uid).value||0);
+  var btn = document.getElementById('sendbtn-'+uid);
+  btn.disabled = true; btn.textContent = 'Đang gửi…';
+  fetch('/dashboard/api/units/'+uid+'/command/', {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({mode:'manual', speed:speed})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.textContent = d.ok ? '✓ Đã gửi' : '✗ Lỗi';
+    setTimeout(function(){ btn.disabled=false; btn.textContent='Gửi lệnh ↗'; }, 1800);
+  }).catch(function(){
+    btn.disabled=false; btn.textContent='Gửi lệnh ↗';
+  });
+}
+
+function getCookie(n) {
+  var m = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)');
+  return m ? m[2] : '';
+}
+
+// Zone filter
+document.querySelectorAll('.ztab').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.ztab').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var z = btn.dataset.zone;
+    document.querySelectorAll('.unit-card').forEach(function(c){
+      c.style.display = (z==='all'||c.dataset.zone===z) ? '' : 'none';
+    });
+  });
+});
+
+// Live polling every 5 seconds
+function updateCards(data) {
+  data.units.forEach(function(u) {
+    var uid = u.unit_id;
+    var info = UNIT_DATA[uid]||{co_warn:25, co_alarm:50};
+    var co = u.co_ppm, spd = u.speed_pct, st = u.co_status;
+    var card = document.getElementById('card-'+uid);
+    if(!card) return;
+    // CO value
+    var coEl = document.getElementById('co-val-'+uid);
+    if(coEl) coEl.textContent = co !== null ? parseFloat(co).toFixed(1)+' ppm' : '— ppm';
+    // CO bar
+    var bar = document.getElementById('co-bar-'+uid);
+    if(bar && co !== null) {
+      bar.style.width = Math.min(100, (co/info.co_alarm)*100)+'%';
+      bar.className = 'co-bar '+st;
+    }
+    // CO status text
+    var cst = document.getElementById('co-st-'+uid);
+    if(cst) {
+      cst.className = 'co-status-txt '+st;
+      cst.textContent = st==='alarm'?'⚠ Báo động CO!':st==='warning'?'⚡ Cảnh báo CO':st==='normal'?'✓ CO bình thường':'Chưa có dữ liệu';
+    }
+    // Speed
+    var spdEl = document.getElementById('spd-val-'+uid);
+    if(spdEl) spdEl.innerHTML = (spd||0)+'<span style="font-size:13px;font-weight:500;color:var(--txt-2)">%</span>';
+    var sbar = document.getElementById('spd-bar-'+uid);
+    if(sbar) sbar.style.width = (spd||0)+'%';
+    // Fan animation
+    var wrap = document.getElementById('fanwrap-'+uid);
+    var blades = document.getElementById('fanblades-'+uid);
+    if(wrap && blades) {
+      var cls = u.is_tripped ? 'trip' : (spd&&spd>0 ? 'running' : 'off');
+      wrap.className = 'fan-anim-wrap '+cls;
+      blades.style.color = u.is_tripped ? '#f87171' : (spd&&spd>0 ? '#38bdf8' : '#475569');
+      blades.style.animation = (!u.is_tripped && spd&&spd>0) ? '' : 'none';
+    }
+    // Card border
+    card.className = card.className.replace(/co-(alarm|warning|normal|offline)/g,'');
+    card.classList.add('co-'+st);
+    if(!u.online) card.classList.add('offline');
+  });
+}
+
+setInterval(function(){
+  fetch('/dashboard/api/telemetry/').then(function(r){ return r.json(); }).then(updateCards).catch(function(){});
+}, 5000);
+</script>
+{% endblock %}
