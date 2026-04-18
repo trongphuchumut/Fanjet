@@ -54,6 +54,9 @@ if __name__ == "__main__":
         serve(application, host=HOST, port=PORT, threads=8)
     except KeyboardInterrupt:
         print("\nĐang tắt server...")
+    except Exception as e:
+        print(f"\n❌ Lỗi Server: {e}")
+        print("Có thể port 8080 đang bị sử dụng bởi một ứng dụng khác (hoặc server cũ chưa tắt hẳn).")
     finally:
         stop_mqtt()
         print("Đã tắt an toàn!")

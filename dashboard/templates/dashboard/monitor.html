@@ -187,6 +187,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 <script>
 (function(){
   var log       = document.getElementById('msg-log');
@@ -194,22 +195,13 @@
   var autoScroll= true;
   var filter    = 'all';
   var PREFIX    = '{{ mqtt_config.topic_prefix|default:"fanjet/basement" }}';
-
-  var DEMO_MSGS = [
-    { topic: PREFIX+'/F01/status', payload: '{"status":"running","rpm":1450}', dir:'sub' },
-    { topic: PREFIX+'/F02/data',   payload: '{"temp":29.1,"power":115,"humidity":62}', dir:'sub' },
-    { topic: PREFIX+'/F05/status', payload: '{"status":"running","rpm":1500}', dir:'sub' },
-    { topic: PREFIX+'/F01/data',   payload: '{"temp":28.5,"power":120,"humidity":58}', dir:'sub' },
-    { topic: PREFIX+'/F04/status', payload: '{"status":"fault","code":"OVT","temp":34.2}', dir:'sub', fault:true },
-    { topic: PREFIX+'/all/command',payload: 'ON', dir:'pub' },
-    { topic: PREFIX+'/F06/data',   payload: '{"temp":30.2,"power":118,"humidity":65}', dir:'sub' },
-    { topic: PREFIX+'/F03/status', payload: '{"status":"off"}', dir:'sub' },
-    { topic: PREFIX+'/F07/data',   payload: '{"temp":28.9,"power":116,"humidity":60}', dir:'sub' },
-    { topic: PREFIX+'/F04/status', payload: '{"status":"fault","code":"OVT"}', dir:'sub', fault:true },
-    { topic: '$SYS/broker/clients/connected', payload: '8', dir:'sys' },
-    { topic: PREFIX+'/F08/data',   payload: '{"temp":29.5,"power":122,"humidity":61}', dir:'sub' },
-  ];
-  var msgIdx = 0;
+  
+  // Setup Paho MQTT Client
+  var brokerHost = window.location.hostname || 'localhost';
+  var brokerPort = 9001; // Port WebSockets
+  var clientId = 'web-mon-' + Math.random().toString(16).substr(2, 8);
+  var client = new Paho.MQTT.Client(brokerHost, brokerPort, clientId);
+  var isMqttConnected = false;
 
   function now() {
     return new Date().toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -219,13 +211,14 @@
     if(filter==='all') return true;
     if(filter==='fault') return row.fault;
     if(filter==='status')  return row.topic.includes('/status');
-    if(filter==='data')    return row.topic.includes('/data');
+    if(filter==='data')    return row.topic.includes('/data') || row.topic.includes('/telemetry');
     if(filter==='command') return row.topic.includes('/command');
     return true;
   }
 
   function addRow(msg) {
     if(!matchFilter(msg)) return;
+    if(paused) return;
     var row = document.createElement('div');
     row.className = 'log-row' + (msg.fault ? ' fault' : '');
     row.innerHTML =
@@ -237,14 +230,49 @@
     if(autoScroll) log.scrollTop = log.scrollHeight;
   }
 
-  /* Auto-feed demo messages */
-  function nextMsg() {
-    if(!paused) addRow(DEMO_MSGS[msgIdx % DEMO_MSGS.length]);
-    msgIdx++;
+  client.onConnectionLost = function (responseObject) {
+    isMqttConnected = false;
+    if (responseObject.errorCode !== 0) {
+      console.error("MQTT Connection Lost: " + responseObject.errorMessage);
+    }
+    var badge = document.getElementById('conn-badge');
+    badge.className = 'mon-conn-badge disconnected';
+    badge.innerHTML = '<span class="dot"></span>Mất kết nối';
+    setTimeout(connectMQTT, 5000);
+  };
+
+  client.onMessageArrived = function (message) {
+    var topic = message.destinationName;
+    var payload = message.payloadString;
+    var isFault = payload.includes('"tripped": true');
+    console.log("MQTT Received:", topic, payload);
+    addRow({topic: topic, payload: payload, dir: 'sub', fault: isFault});
+  };
+
+  function connectMQTT() {
+    console.log("Connecting to MQTT via WebSocket: " + brokerHost + ":" + brokerPort);
+    client.connect({
+      onSuccess: function() {
+        console.log("Connected to MQTT WebSocket!");
+        isMqttConnected = true;
+        var badge = document.getElementById('conn-badge');
+        badge.className = 'mon-conn-badge connected';
+        badge.innerHTML = '<span class="dot"></span>Đã kết nối';
+        
+        // Subscribe to all topics under the prefix
+        client.subscribe(PREFIX + "/#");
+        console.log("Subscribed to " + PREFIX + "/#");
+      },
+      onFailure: function(e) {
+        console.error("MQTT Connection failed: " + e.errorMessage);
+        isMqttConnected = false;
+        setTimeout(connectMQTT, 5000);
+      }
+    });
   }
-  var timer = setInterval(nextMsg, 900);
-  /* Burst first 4 messages */
-  for(var i=0;i<4;i++) addRow(DEMO_MSGS[i]);
+
+  // Khởi chạy kết nối
+  connectMQTT();
 
   /* Filter chips */
   document.querySelectorAll('.chip').forEach(function(c){
@@ -279,10 +307,34 @@
   document.getElementById('btn-publish').addEventListener('click', function(){
     var topic   = document.getElementById('pub-topic').value.trim();
     var payload = document.getElementById('pub-payload').value.trim();
-    if(!topic||!payload) return;
+    if(!topic||!payload) {
+        console.warn("Topic or payload is empty.");
+        return;
+    }
+    
+    console.log("MQTT Send Button Clicked:", topic, payload);
+    
+    // Ghi log trên giao diện
     addRow({topic:topic, payload:payload, dir:'pub'});
+    
+    // Thực sự Publish qua MQTT
+    if (isMqttConnected) {
+        try {
+            var message = new Paho.MQTT.Message(payload);
+            message.destinationName = topic;
+            client.send(message);
+            console.log("MQTT Message Sent successfully.");
+        } catch (err) {
+            console.error("Error sending MQTT message:", err);
+            alert("Lỗi khi gửi bản tin: " + err.message);
+        }
+    } else {
+        alert("Chưa kết nối đến MQTT Broker! Vui lòng chờ kết nối.");
+    }
+    
     document.getElementById('pub-payload').value='';
   });
+  
   document.getElementById('pub-payload').addEventListener('keydown', function(e){
     if(e.key==='Enter') document.getElementById('btn-publish').click();
   });
