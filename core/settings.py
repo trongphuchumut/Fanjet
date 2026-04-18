@@ -31,12 +31,46 @@ else:
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-1wm5@8a0f&3nb=_c#g-cf$k_6!eifw7b6su0p#5xeov(s@ay@2'
+SECRET_KEY = '4a$-1$*46b_q0@nel=p30m%75qncl5$(!mtg$w9tkfea(&#(fv'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
 ALLOWED_HOSTS = ['*']
+
+# Production domain
+CSRF_TRUSTED_ORIGINS = [
+    'http://fan-auto.cloud',
+    'https://fan-auto.cloud',
+    'http://www.fan-auto.cloud',
+    'https://www.fan-auto.cloud',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+]
+
+# ─── Security Headers ──────────────────────────────────────────────────────────
+# Chống Clickjacking
+X_FRAME_OPTIONS = 'DENY'
+
+# Chống Content-Type sniffing
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Bật XSS filter trên trình duyệt cũ
+SECURE_BROWSER_XSS_FILTER = True
+
+# Referrer Policy
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# ─── Session Security ───────────────────────────────────────────────────────────
+# Tự động hết hạn session sau 8 giờ không hoạt động
+SESSION_COOKIE_AGE = 8 * 60 * 60  # 8 giờ (giây)
+SESSION_SAVE_EVERY_REQUEST = True   # Làm mới thời gian mỗi request
+SESSION_COOKIE_HTTPONLY = True      # JS không đọc được cookie session
+SESSION_COOKIE_SAMESITE = 'Lax'    # Chống CSRF qua third-party
+
+# CSRF cookie
+CSRF_COOKIE_HTTPONLY = False         # Cần False để JS đọc (Django form dùng)
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 
 # Application definition
