@@ -131,12 +131,12 @@
 
   <!-- Header -->
   <div class="mon-head">
-    <div class="mon-conn-badge {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}connected{% else %}disconnected{% endif %}" id="conn-badge">
+    <div class="mon-conn-badge disconnected" id="conn-badge">
       <span class="dot"></span>
-      {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}Đã kết nối{% else %}Chưa kết nối{% endif %}
+      Đang kết nối…
     </div>
     <span class="mon-broker">
-      {% if mqtt_config %}{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }}{% else %}Chưa cấu hình broker{% endif %}
+      {% if mqtt_config %}{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }} (WS: {{ ws_port }}){% else %}Chưa cấu hình broker{% endif %}
     </span>
 
     <div class="filter-chips">
@@ -196,9 +196,17 @@
   var filter    = 'all';
   var PREFIX    = '{{ mqtt_config.topic_prefix|default:"fanjet/basement" }}';
   
+  // MQTT credentials from Django config
+  var mqttUser = '{{ mqtt_config.username|default:"" }}';
+  var mqttPass = '{{ mqtt_config.password|default:"" }}';
+  
   // Setup Paho MQTT Client
-  var brokerHost = window.location.hostname || 'localhost';
-  var brokerPort = 9001; // Port WebSockets
+  var brokerHost = '{{ mqtt_config.broker_host|default:"localhost" }}';
+  // If broker is localhost/127.0.0.1, use the page hostname (so browser can reach it)
+  if (brokerHost === 'localhost' || brokerHost === '127.0.0.1') {
+    brokerHost = window.location.hostname || 'localhost';
+  }
+  var brokerPort = {{ ws_port|default:9001 }}; // WebSocket port from BrokerConfig
   var clientId = 'web-mon-' + Math.random().toString(16).substr(2, 8);
   var client = new Paho.MQTT.Client(brokerHost, brokerPort, clientId);
   var isMqttConnected = false;
@@ -251,7 +259,7 @@
 
   function connectMQTT() {
     console.log("Connecting to MQTT via WebSocket: " + brokerHost + ":" + brokerPort);
-    client.connect({
+    var connectOptions = {
       onSuccess: function() {
         console.log("Connected to MQTT WebSocket!");
         isMqttConnected = true;
@@ -261,14 +269,26 @@
         
         // Subscribe to all topics under the prefix
         client.subscribe(PREFIX + "/#");
+        client.subscribe("$SYS/#");  // System topics for monitoring
         console.log("Subscribed to " + PREFIX + "/#");
       },
       onFailure: function(e) {
         console.error("MQTT Connection failed: " + e.errorMessage);
         isMqttConnected = false;
+        var badge = document.getElementById('conn-badge');
+        badge.className = 'mon-conn-badge disconnected';
+        badge.innerHTML = '<span class="dot"></span>Kết nối thất bại';
         setTimeout(connectMQTT, 5000);
-      }
-    });
+      },
+      timeout: 10,
+      keepAliveInterval: 30,
+    };
+    // Add credentials if configured
+    if (mqttUser) {
+      connectOptions.userName = mqttUser;
+      connectOptions.password = mqttPass;
+    }
+    client.connect(connectOptions);
   }
 
   // Khởi chạy kết nối

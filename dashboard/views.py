@@ -134,8 +134,17 @@ def unit_delete_view(request, unit_id):
 
 @login_required(login_url='accounts:login')
 def monitor_view(request):
+    # Get WebSocket port from BrokerConfig
+    ws_port = 9001  # default
+    try:
+        from mqtt_broker.models import BrokerConfig
+        broker_cfg, _ = BrokerConfig.objects.get_or_create(pk=1)
+        if broker_cfg.enable_websocket:
+            ws_port = broker_cfg.ws_port
+    except Exception:
+        pass
     return render(request, 'dashboard/monitor.html', {
-        'page': 'monitor', 'mqtt_config': _mqtt_cfg(),
+        'page': 'monitor', 'mqtt_config': _mqtt_cfg(), 'ws_port': ws_port,
     })
 
 
