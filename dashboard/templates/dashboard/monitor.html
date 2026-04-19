@@ -83,17 +83,47 @@
   .log-dir.sys { background: rgba(251,191,36,.12); color: var(--amber); }
 
   /* Highlight by type */
-  .log-row.fault { background: rgba(248,113,113,.04); }
-  .log-row.fault .log-payload { color: var(--red); }
-
-  /* Input bar */
+  .sub-bar {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .pub-bar {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .conn-bar {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface);
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .input-text {
+    height: 34px; padding: 0 10px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    outline: none; transition: border-color .2s;
+  }
+  .input-text:focus { border-color: var(--cyan); }
+  
+  .sub-topic, .pub-topic {
+    flex: 0 0 220px;
+  }
   .pub-bar {
     padding: 10px 18px;
     border-top: 1px solid var(--border);
     background: var(--bg-surface);
     display: flex; gap: 8px; align-items: center; flex-shrink: 0;
   }
-  .pub-topic {
+  .sub-topic, .pub-topic {
     flex: 0 0 220px;
     height: 38px; padding: 0 10px;
     background: var(--bg);
@@ -102,7 +132,7 @@
     color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
     outline: none; transition: border-color .2s;
   }
-  .pub-topic:focus { border-color: var(--cyan); }
+  .sub-topic:focus, .pub-topic:focus { border-color: var(--cyan); }
   .pub-payload {
     flex: 1; height: 38px; padding: 0 10px;
     background: var(--bg);
@@ -112,17 +142,23 @@
     outline: none; transition: border-color .2s;
   }
   .pub-payload:focus { border-color: var(--green); }
-  .btn-publish {
+  .btn-subscribe, .btn-publish {
     height: 38px; padding: 0 16px; border-radius: 8px; border: none;
-    background: linear-gradient(135deg, #059669, #047857);
-    color: #fff; font-family: inherit; font-size: 13px; font-weight: 700;
-    cursor: pointer; box-shadow: 0 2px 10px rgba(5,150,105,.3);
-    display: flex; align-items: center; gap: 7px; flex-shrink: 0;
-    transition: opacity .2s, transform .2s;
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+    transition: opacity .2s, transform .2s; color: #fff;
   }
-  .btn-publish:hover { opacity: .88; transform: translateY(-1px); }
-  .btn-publish svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; }
-  @media (max-width: 600px) { .pub-topic { flex: 0 0 140px; } }
+  .btn-subscribe {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    box-shadow: 0 2px 10px rgba(2,132,199,.3);
+  }
+  .btn-publish {
+    background: linear-gradient(135deg, #059669, #047857);
+    box-shadow: 0 2px 10px rgba(5,150,105,.3);
+  }
+  .btn-subscribe:hover, .btn-publish:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-subscribe svg, .btn-publish svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; }
+  @media (max-width: 600px) { .sub-topic, .pub-topic { flex: 0 0 140px; } }
 </style>
 {% endblock %}
 
@@ -133,11 +169,8 @@
   <div class="mon-head">
     <div class="mon-conn-badge disconnected" id="conn-badge">
       <span class="dot"></span>
-      Đang kết nối…
+      <span id="conn-status-text">Chưa kết nối</span>
     </div>
-    <span class="mon-broker">
-      {% if mqtt_config %}{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }} (WS: {{ ws_port }}){% else %}Chưa cấu hình broker{% endif %}
-    </span>
 
     <div class="filter-chips">
       <button class="chip active" data-f="all">Tất cả</button>
@@ -163,6 +196,18 @@
     </div>
   </div>
 
+  <!-- Connection bar -->
+  <div class="conn-bar">
+    <input type="text" class="input-text" id="conn-host" placeholder="Broker Host (VD: broker.hivemq.com)" value="{{ mqtt_config.broker_host|default:'127.0.0.1' }}" style="flex: 1; min-width: 150px;" />
+    <input type="number" class="input-text" id="conn-port" placeholder="Port WS" value="{{ ws_port|default:9001 }}" style="width: 90px;" />
+    <input type="text" class="input-text" id="conn-user" placeholder="Username (Tùy chọn)" value="{{ mqtt_config.username|default:'' }}" style="width: 140px;" />
+    <input type="password" class="input-text" id="conn-pass" placeholder="Password (Tùy chọn)" value="{{ mqtt_config.password|default:'' }}" style="width: 140px;" />
+    <button class="btn-subscribe" id="btn-connect" style="background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 2px 10px rgba(79,70,229,.3);">
+      <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      <span id="btn-connect-text">Kết nối</span>
+    </button>
+  </div>
+
   <!-- Log -->
   <div class="msg-log" id="msg-log" aria-live="polite" aria-label="Nhật ký MQTT">
     <div class="log-row" style="border-bottom:1px solid var(--border-strong);padding-top:8px;padding-bottom:8px">
@@ -173,9 +218,18 @@
     </div>
   </div>
 
+  <!-- Subscribe bar -->
+  <div class="sub-bar">
+    <input type="text" class="sub-topic" id="sub-topic" placeholder="Topic muốn theo dõi" value="#" />
+    <button class="btn-subscribe" id="btn-subscribe">
+      <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      Đăng ký (Subscribe)
+    </button>
+  </div>
+
   <!-- Publish bar -->
   <div class="pub-bar">
-    <input type="text" class="pub-topic"   id="pub-topic"   placeholder="topic/path" value="{{ mqtt_config.topic_prefix|default:'fanjet/basement' }}/F01/command" />
+    <input type="text" class="pub-topic"   id="pub-topic"   placeholder="Topic muốn gửi" value="{{ mqtt_config.topic_prefix|default:'fanjet/basement' }}/F01/command" />
     <input type="text" class="pub-payload" id="pub-payload" placeholder='{"cmd":"ON"}' />
     <button class="btn-publish" id="btn-publish">
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
@@ -196,19 +250,12 @@
   var filter    = 'all';
   var PREFIX    = '{{ mqtt_config.topic_prefix|default:"fanjet/basement" }}';
   
-  // MQTT credentials from Django config
-  var mqttUser = '{{ mqtt_config.username|default:"" }}';
-  var mqttPass = '{{ mqtt_config.password|default:"" }}';
-  
-  // Setup Paho MQTT Client
-  var brokerHost = '{{ mqtt_config.broker_host|default:"localhost" }}';
-  // If broker is localhost/127.0.0.1, use the page hostname (so browser can reach it)
+  var brokerHost = '{{ mqtt_config.broker_host|default:"127.0.0.1" }}';
   if (brokerHost === 'localhost' || brokerHost === '127.0.0.1') {
-    brokerHost = window.location.hostname || 'localhost';
+    document.getElementById('conn-host').value = window.location.hostname || '127.0.0.1';
   }
-  var brokerPort = {{ ws_port|default:9001 }}; // WebSocket port from BrokerConfig
-  var clientId = 'web-mon-' + Math.random().toString(16).substr(2, 8);
-  var client = new Paho.MQTT.Client(brokerHost, brokerPort, clientId);
+
+  var client = null;
   var isMqttConnected = false;
 
   function now() {
@@ -224,32 +271,66 @@
     return true;
   }
 
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   function addRow(msg) {
     if(!matchFilter(msg)) return;
     if(paused) return;
     var row = document.createElement('div');
     row.className = 'log-row' + (msg.fault ? ' fault' : '');
+    var safePayload = escapeHTML(msg.payload);
+    var safeTopic = escapeHTML(msg.topic);
     row.innerHTML =
       '<span class="log-time">'+now()+'</span>'+
-      '<span class="log-topic" title="'+msg.topic+'">'+msg.topic+'</span>'+
-      '<span class="log-payload" title="'+msg.payload+'">'+msg.payload+'</span>'+
+      '<span class="log-topic" title="'+safeTopic+'">'+safeTopic+'</span>'+
+      '<span class="log-payload" title="'+safePayload+'">'+safePayload+'</span>'+
       '<span class="log-dir '+msg.dir+'">'+msg.dir.toUpperCase()+'</span>';
     log.appendChild(row);
     if(autoScroll) log.scrollTop = log.scrollHeight;
   }
 
-  client.onConnectionLost = function (responseObject) {
+  function onConnectionLost(responseObject) {
     isMqttConnected = false;
     if (responseObject.errorCode !== 0) {
       console.error("MQTT Connection Lost: " + responseObject.errorMessage);
+      addRow({topic: "$SYS", payload: "Mất kết nối: " + responseObject.errorMessage, dir: 'sys', fault: true});
+    } else {
+      addRow({topic: "$SYS", payload: "Đã ngắt kết nối an toàn", dir: 'sys'});
     }
-    var badge = document.getElementById('conn-badge');
-    badge.className = 'mon-conn-badge disconnected';
-    badge.innerHTML = '<span class="dot"></span>Mất kết nối';
-    setTimeout(connectMQTT, 5000);
-  };
+    updateConnectionUI();
+  }
 
-  client.onMessageArrived = function (message) {
+  function updateConnectionUI() {
+    var badge = document.getElementById('conn-badge');
+    var statusText = document.getElementById('conn-status-text');
+    var btnConnect = document.getElementById('btn-connect');
+    var btnText = document.getElementById('btn-connect-text');
+    
+    if (isMqttConnected) {
+      badge.className = 'mon-conn-badge connected';
+      statusText.innerText = 'Đã kết nối';
+      btnConnect.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+      btnConnect.style.boxShadow = '0 2px 10px rgba(220,38,38,.3)';
+      btnText.innerText = 'Ngắt kết nối';
+      btnConnect.querySelector('svg').innerHTML = '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>';
+    } else {
+      badge.className = 'mon-conn-badge disconnected';
+      statusText.innerText = 'Chưa kết nối';
+      btnConnect.style.background = 'linear-gradient(135deg, #4f46e5, #4338ca)';
+      btnConnect.style.boxShadow = '0 2px 10px rgba(79,70,229,.3)';
+      btnText.innerText = 'Kết nối';
+      btnConnect.querySelector('svg').innerHTML = '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>';
+    }
+  }
+
+  function onMessageArrived(message) {
     var topic = message.destinationName;
     var payload = message.payloadString;
     var isFault = payload.includes('"tripped": true');
@@ -257,42 +338,75 @@
     addRow({topic: topic, payload: payload, dir: 'sub', fault: isFault});
   };
 
-  function connectMQTT() {
-    console.log("Connecting to MQTT via WebSocket: " + brokerHost + ":" + brokerPort);
+  function toggleConnection() {
+    if (isMqttConnected) {
+      if (client) client.disconnect();
+      return;
+    }
+
+    var host = document.getElementById('conn-host').value.trim();
+    var port = parseInt(document.getElementById('conn-port').value.trim()) || 9001;
+    var user = document.getElementById('conn-user').value.trim();
+    var pass = document.getElementById('conn-pass').value.trim();
+
+    if (!host) {
+      alert("Vui lòng nhập Broker Host");
+      return;
+    }
+
+    var clientId = 'web-mon-' + Math.random().toString(16).substr(2, 8);
+    client = new Paho.MQTT.Client(host, port, clientId);
+    client.onConnectionLost = onConnectionLost;
+    client.onMessageArrived = onMessageArrived;
+
+    document.getElementById('conn-status-text').innerText = 'Đang kết nối...';
+
+    console.log("Connecting to MQTT via WebSocket: " + host + ":" + port);
     var connectOptions = {
       onSuccess: function() {
         console.log("Connected to MQTT WebSocket!");
         isMqttConnected = true;
-        var badge = document.getElementById('conn-badge');
-        badge.className = 'mon-conn-badge connected';
-        badge.innerHTML = '<span class="dot"></span>Đã kết nối';
+        updateConnectionUI();
+        addRow({topic: "$SYS", payload: "Kết nối thành công tới " + host + ":" + port, dir: 'sys'});
         
-        // Subscribe to all topics under the prefix
-        client.subscribe(PREFIX + "/#");
-        client.subscribe("$SYS/#");  // System topics for monitoring
-        console.log("Subscribed to " + PREFIX + "/#");
+        // Subscribe to default and custom
+        var customTopic = document.getElementById('sub-topic').value.trim();
+        if(customTopic) {
+            client.subscribe(customTopic);
+            console.log("Subscribed to " + customTopic);
+            addRow({topic: "$SYS", payload: "Đã đăng ký: " + customTopic, dir: 'sys'});
+        }
       },
       onFailure: function(e) {
         console.error("MQTT Connection failed: " + e.errorMessage);
         isMqttConnected = false;
-        var badge = document.getElementById('conn-badge');
-        badge.className = 'mon-conn-badge disconnected';
-        badge.innerHTML = '<span class="dot"></span>Kết nối thất bại';
-        setTimeout(connectMQTT, 5000);
+        updateConnectionUI();
+        addRow({topic: "$SYS", payload: "Kết nối thất bại: " + e.errorMessage, dir: 'sys', fault: true});
+        alert("Lỗi kết nối tới Broker: " + e.errorMessage);
       },
       timeout: 10,
       keepAliveInterval: 30,
     };
-    // Add credentials if configured
-    if (mqttUser) {
-      connectOptions.userName = mqttUser;
-      connectOptions.password = mqttPass;
+    if (user) {
+      connectOptions.userName = user;
+      connectOptions.password = pass;
     }
-    client.connect(connectOptions);
+    
+    // Determine if we need secure wss:// connection based on current page or standard ports
+    if (window.location.protocol === "https:" || port === 443 || port === 8084 || port === 8884) {
+       connectOptions.useSSL = true;
+    }
+    
+    try {
+        client.connect(connectOptions);
+    } catch (err) {
+        alert("Không thể khởi tạo kết nối: " + err.message);
+        document.getElementById('conn-status-text').innerText = 'Chưa kết nối';
+    }
   }
 
-  // Khởi chạy kết nối
-  connectMQTT();
+  // Bind Connect button
+  document.getElementById('btn-connect').addEventListener('click', toggleConnection);
 
   /* Filter chips */
   document.querySelectorAll('.chip').forEach(function(c){
@@ -321,6 +435,26 @@
     var header = log.firstChild;
     log.innerHTML = '';
     log.appendChild(header);
+  });
+
+  /* Subscribe */
+  document.getElementById('btn-subscribe').addEventListener('click', function(){
+    var topic = document.getElementById('sub-topic').value.trim();
+    if(!topic) {
+        alert("Vui lòng nhập Topic cần theo dõi.");
+        return;
+    }
+    if (isMqttConnected) {
+        client.subscribe(topic);
+        console.log("Subscribed to " + topic);
+        addRow({topic: "$SYS", payload: "Đã đăng ký nhận tin từ topic: " + topic, dir: 'sys'});
+    } else {
+        alert("Chưa kết nối đến MQTT Broker!");
+    }
+  });
+
+  document.getElementById('sub-topic').addEventListener('keydown', function(e){
+    if(e.key==='Enter') document.getElementById('btn-subscribe').click();
   });
 
   /* Publish */
