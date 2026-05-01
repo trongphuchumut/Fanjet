@@ -15,12 +15,12 @@
   .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
   @media(max-width:800px){ .cfg-grid{ grid-template-columns:1fr; } }
   .s-card  { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-  .s-head  { padding:14px 18px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12);
+  .s-head  { padding:14px 18px; border-bottom:1px solid var(--border); background:var(--bg-hover);
              display:flex; align-items:center; gap:10px; }
   .s-icon  { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .s-icon svg { width:14px; height:14px; stroke:#fff; fill:none; stroke-width:2; }
   .s-body  { padding:18px; display:flex; flex-direction:column; gap:14px; }
-  .s-foot  { padding:12px 18px; border-top:1px solid var(--border); background:rgba(0,0,0,.1); display:flex; gap:10px; align-items:center; }
+  .s-foot  { padding:12px 18px; border-top:1px solid var(--border); background:var(--bg-hover); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
   .field { display:flex; flex-direction:column; gap:5px; }
   .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -41,7 +41,7 @@
   .toggle-row:last-child { border-bottom:none; }
   .ts { position:relative; width:40px; height:22px; flex-shrink:0; cursor:pointer; }
   .ts input { opacity:0; width:0; height:0; }
-  .ts-sl { position:absolute; inset:0; border-radius:99px; background:rgba(255,255,255,.08); border:1px solid var(--border-strong); transition:all .18s; }
+  .ts-sl { position:absolute; inset:0; border-radius:99px; background:var(--bg-raised); border:1px solid var(--border-strong); transition:all .18s; }
   .ts-sl::before { content:''; position:absolute; left:3px; top:50%; transform:translateY(-50%); width:14px; height:14px; background:var(--txt-2); border-radius:50%; transition:all .18s; }
   .ts input:checked + .ts-sl { background:rgba(56,189,248,.2); border-color:var(--cyan); }
   .ts input:checked + .ts-sl::before { background:var(--cyan); transform:translateX(18px) translateY(-50%); }
@@ -52,39 +52,67 @@
                padding:10px 14px; line-height:1.8; }
   .topic-box span { display:block; }
 
+  /* MQTT Client status banner */
+  .mqtt-status-banner {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 14px; border-radius:10px;
+    font-size:13px; font-weight:600;
+    margin-bottom:14px;
+    transition: all .3s;
+  }
+  .mqtt-status-banner.connected    { background:rgba(74,222,128,.1); border:1px solid rgba(74,222,128,.25); color:var(--green); }
+  .mqtt-status-banner.disconnected { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.25); color:var(--red); }
+  .mqtt-status-banner.connecting   { background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.25); color:var(--amber); }
+  .mqtt-status-banner.error        { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.25); color:var(--red); }
+  .mqtt-status-banner .dot { width:8px; height:8px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  .mqtt-status-banner.connected .dot { animation: pulse-g 2s ease-in-out infinite; }
+  @keyframes pulse-g { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .mqtt-status-banner .meta { font-size:11.5px; color:var(--txt-2); font-weight:400; margin-left:auto; }
+
   /* Buttons */
   .btn-save { padding:8px 20px; border-radius:9px; border:none; background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 2px 10px rgba(14,165,233,.25); transition:opacity .15s,transform .15s; }
   .btn-save:hover { opacity:.88; transform:translateY(-1px); }
   .btn-test { padding:8px 16px; border-radius:9px; border:1px solid var(--border-strong); background:none; color:var(--txt-2); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background .15s; }
   .btn-test svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; }
   .btn-test:hover { background:var(--bg-hover); color:var(--txt); }
+  .btn-disconnect { padding:8px 16px; border-radius:9px; border:1px solid rgba(248,113,113,.3); background:rgba(248,113,113,.08); color:var(--red); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:opacity .15s; }
+  .btn-disconnect:hover { opacity:.8; }
 </style>
 {% endblock %}
 
 {% block content %}
 
 <div class="tab-bar" role="tablist">
-  <button class="tab-btn active" data-tab="mqtt" role="tab">🔌 MQTT Broker</button>
+  <button class="tab-btn active" data-tab="mqtt" role="tab">🔌 MQTT Client</button>
   <button class="tab-btn" data-tab="ollama" role="tab">🤖 AI Ollama</button>
+  <button class="tab-btn" data-tab="perf" role="tab">📊 Hiệu năng</button>
 </div>
 
-<!-- ─── MQTT Tab ─────────────────────────────────────────────────────── -->
+<!-- ─── MQTT Client Tab ──────────────────────────────────────────────── -->
 <div class="tab-panel active" id="tab-mqtt">
+
+  <!-- Status banner -->
+  <div class="mqtt-status-banner disconnected" id="mqtt-status-banner">
+    <span class="dot"></span>
+    <span id="mqtt-status-text">Đang kiểm tra…</span>
+    <span class="meta" id="mqtt-status-meta"></span>
+  </div>
+
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="_tab" value="mqtt" />
 
     <div class="cfg-grid">
 
-      <!-- Broker settings -->
+      <!-- Broker connection settings -->
       <div class="s-card">
         <div class="s-head">
           <div class="s-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">
-            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
           </div>
           <div>
-            <div style="font-size:13.5px;font-weight:700">MQTT Broker</div>
-            <div style="font-size:12px;color:var(--txt-2)">Thông tin kết nối máy chủ</div>
+            <div style="font-size:13.5px;font-weight:700">Kết nối MQTT</div>
+            <div style="font-size:12px;color:var(--txt-2)">Cấu hình client kết nối đến broker</div>
           </div>
         </div>
         <div class="s-body">
@@ -93,6 +121,7 @@
               <label>Địa chỉ Broker</label>
               <input type="text" name="broker_host" class="mono"
                      value="{{ mqtt_form.broker_host.value|default:'' }}" placeholder="192.168.1.100" id="inp-host" />
+              <span class="field-hint">IP hoặc hostname của MQTT broker</span>
             </div>
             <div class="field">
               <label>Cổng (Port)</label>
@@ -123,12 +152,23 @@
             </div>
             <label class="ts"><input type="checkbox" name="use_tls" {% if mqtt_form.use_tls.value %}checked{% endif %}/><span class="ts-sl"></span></label>
           </div>
+          <div class="toggle-row">
+            <div>
+              <div style="font-size:13px;font-weight:500">Tự kết nối khi khởi động</div>
+              <div style="font-size:11.5px;color:var(--txt-2)">MQTT client tự kết nối khi web server khởi động</div>
+            </div>
+            <label class="ts"><input type="checkbox" name="auto_connect" {% if mqtt_form.auto_connect.value %}checked{% endif %}/><span class="ts-sl"></span></label>
+          </div>
         </div>
         <div class="s-foot">
-          <button type="submit" class="btn-save">Lưu cấu hình MQTT</button>
-          <button type="button" class="btn-test" id="btn-test-mqtt">
-            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg>
-            Kiểm tra kết nối
+          <button type="submit" class="btn-save">Lưu & Kết nối lại</button>
+          <button type="button" class="btn-test" id="btn-reconnect">
+            <svg viewBox="0 0 24 24"><polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Kết nối lại
+          </button>
+          <button type="button" class="btn-disconnect" id="btn-disconnect">
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Ngắt kết nối
           </button>
         </div>
       </div>
@@ -243,6 +283,74 @@
   </form>
 </div>
 
+<!-- ─── Performance Monitor Tab ─────────────────────────────────────── -->
+<div class="tab-panel" id="tab-perf">
+  <div class="s-card" style="max-width:680px">
+    <div class="s-head">
+      <div class="s-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+        <svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13.5px;font-weight:700">Performance Monitor</div>
+        <div style="font-size:12px;color:var(--txt-2)">Theo dõi CPU & RAM của server in ra terminal</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="perf-status-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--red-dim);color:var(--red)">TẮT</span>
+      </div>
+    </div>
+    <div class="s-body">
+
+      <!-- Controls -->
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="field" style="margin:0;flex:0 0 auto">
+          <label>Interval (giây)</label>
+          <input type="number" id="perf-interval" class="mono" value="5" min="1" max="60" step="1" style="width:80px;height:36px" />
+        </div>
+        <button type="button" class="btn-save" id="btn-perf-toggle" style="margin-top:16px;height:36px;padding:0 20px;font-size:12.5px">
+          ▶ Bật Monitor
+        </button>
+      </div>
+
+      <!-- Live stats -->
+      <div id="perf-stats" style="display:none">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);margin-bottom:8px">Snapshot thời gian thực</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
+          <div class="perf-stat-card" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px">CPU Process</div>
+            <div id="ps-cpu" style="font-size:24px;font-weight:800;color:var(--cyan)">—</div>
+          </div>
+          <div class="perf-stat-card" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px">CPU System</div>
+            <div id="ps-cpu-sys" style="font-size:24px;font-weight:800;color:var(--txt-2)">—</div>
+          </div>
+          <div class="perf-stat-card" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px">RAM (RSS)</div>
+            <div id="ps-ram" style="font-size:24px;font-weight:800;color:var(--green)">—</div>
+          </div>
+          <div class="perf-stat-card" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px">Sys RAM</div>
+            <div id="ps-ram-sys" style="font-size:24px;font-weight:800;color:var(--txt-2)">—</div>
+          </div>
+          <div class="perf-stat-card" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px">Threads</div>
+            <div id="ps-threads" style="font-size:24px;font-weight:800;color:var(--amber)">—</div>
+          </div>
+          <div class="perf-stat-card" style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px">PID</div>
+            <div id="ps-pid" style="font-size:24px;font-weight:800;color:var(--txt-2)">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--txt-3);line-height:1.6">
+        💡 Khi bật, server sẽ in thông số CPU/RAM vào terminal mỗi N giây.<br>
+        Trang này cũng hiện snapshot realtime bên trên.
+      </div>
+
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
@@ -265,20 +373,90 @@ function updatePreview() {
   document.getElementById('tp-profile').innerHTML   = p+'/<b>U01</b>/profile';
 }
 
-// Test MQTT
-document.getElementById('btn-test-mqtt').addEventListener('click', function(){
-  var btn = this, orig = btn.innerHTML;
-  btn.disabled = true; btn.textContent = 'Kiểm tra…';
-  var host = document.getElementById('inp-host').value;
-  setTimeout(function(){
-    btn.textContent = (host && host !== 'localhost') ? '✓ Có thể kết nối' : '✗ Vui lòng nhập IP broker';
-    btn.style.color = (host && host !== 'localhost') ? 'var(--green)' : 'var(--red)';
-    setTimeout(function(){ btn.innerHTML=orig; btn.disabled=false; btn.style.color=''; }, 2500);
-  }, 1600);
+// ── MQTT Client Status Polling ──────────────────────────
+var mqttStatusUrl = '{% url "dashboard:api_mqtt_status" %}';
+var mqttReconnectUrl = '{% url "dashboard:api_mqtt_reconnect" %}';
+var mqttDisconnectUrl = '{% url "dashboard:api_mqtt_disconnect" %}';
+
+function getCsrf() {
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+function updateMqttStatus() {
+  fetch(mqttStatusUrl, { credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'} })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    var banner = document.getElementById('mqtt-status-banner');
+    var txt    = document.getElementById('mqtt-status-text');
+    var meta   = document.getElementById('mqtt-status-meta');
+
+    banner.className = 'mqtt-status-banner ' + (d.status || 'disconnected');
+
+    var labels = {
+      'connected':    '● Đã kết nối',
+      'disconnected': '○ Chưa kết nối',
+      'connecting':   '◌ Đang kết nối…',
+      'error':        '✗ Lỗi kết nối',
+    };
+    txt.textContent = (labels[d.status] || d.status) + (d.broker ? '  →  ' + d.broker : '');
+
+    var parts = [];
+    if (d.error) parts.push('Lỗi: ' + d.error);
+    if (d.uptime_seconds > 0) parts.push('Uptime: ' + formatUptime(d.uptime_seconds));
+    if (d.messages_received > 0) parts.push(d.messages_received + ' msg');
+    meta.textContent = parts.join(' · ');
+  })
+  .catch(function(){ /* ignore */ });
+}
+
+function formatUptime(s) {
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+
+// Poll mỗi 2s
+updateMqttStatus();
+setInterval(updateMqttStatus, 2000);
+
+// Reconnect button
+document.getElementById('btn-reconnect').addEventListener('click', function(){
+  var btn = this; btn.disabled = true; btn.textContent = 'Đang kết nối…';
+  fetch(mqttReconnectUrl, {
+    method:'POST', credentials:'same-origin',
+    headers:{'X-CSRFToken':getCsrf(), 'X-Requested-With':'XMLHttpRequest'}
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    btn.innerHTML = d.ok ? '✓ Đã gửi lệnh kết nối lại' : '✗ ' + (d.error||'Lỗi');
+    btn.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(function(){
+      btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Kết nối lại';
+      btn.disabled = false; btn.style.color = '';
+    }, 3000);
+  });
+});
+
+// Disconnect button
+document.getElementById('btn-disconnect').addEventListener('click', function(){
+  var btn = this; btn.disabled = true;
+  fetch(mqttDisconnectUrl, {
+    method:'POST', credentials:'same-origin',
+    headers:{'X-CSRFToken':getCsrf(), 'X-Requested-With':'XMLHttpRequest'}
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    btn.textContent = d.ok ? '✓ Đã ngắt' : '✗ Lỗi';
+    setTimeout(function(){
+      btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Ngắt kết nối';
+      btn.disabled = false;
+    }, 2000);
+  });
 });
 
 // Load Ollama models
-fetch('/dashboard/api/ollama/models/').then(function(r){return r.json();}).then(function(d){
+fetch('{% url "dashboard:api_ollama_models" %}').then(function(r){return r.json();}).then(function(d){
   var list = document.getElementById('model-list');
   var cloudModels = [
     'qwen3-coder:480b-cloud',
@@ -309,12 +487,72 @@ function selectModel(m) { document.getElementById('inp-ollama-model').value = m;
 document.getElementById('btn-test-ollama').addEventListener('click', function(){
   var btn = this, orig = btn.innerHTML;
   btn.disabled = true; btn.textContent = 'Kiểm tra…';
-  fetch('/dashboard/api/ollama/models/').then(function(r){return r.json();}).then(function(d){
+  fetch('{% url "dashboard:api_ollama_models" %}').then(function(r){return r.json();}).then(function(d){
     btn.innerHTML = orig; btn.disabled = false;
     btn.style.color = d.ok ? 'var(--green)' : 'var(--red)';
     alert(d.ok ? '✓ Ollama kết nối OK! Models: '+d.models.join(', ') : '✗ Lỗi: '+(d.error||'Không kết nối được'));
     setTimeout(function(){ btn.style.color=''; }, 2000);
   });
 });
+
+// ── Performance Monitor ──────────────────────────────
+var perfToggleUrl = '{% url "dashboard:api_perf_toggle" %}';
+var perfStatusUrl = '{% url "dashboard:api_perf_status" %}';
+var perfPolling = null;
+
+function updatePerfBadge(running) {
+  var badge = document.getElementById('perf-status-badge');
+  var btn   = document.getElementById('btn-perf-toggle');
+  if (running) {
+    badge.textContent = 'ĐANG CHẠY';
+    badge.style.background = 'var(--green-dim)'; badge.style.color = 'var(--green)';
+    btn.textContent = '⏹ Tắt Monitor';
+    btn.style.background = 'linear-gradient(135deg,#dc2626,#b91c1c)';
+    document.getElementById('perf-stats').style.display = '';
+    if (!perfPolling) perfPolling = setInterval(fetchPerfSnapshot, 3000);
+  } else {
+    badge.textContent = 'TẮT';
+    badge.style.background = 'var(--red-dim)'; badge.style.color = 'var(--red)';
+    btn.textContent = '▶ Bật Monitor';
+    btn.style.background = '';
+    if (perfPolling) { clearInterval(perfPolling); perfPolling = null; }
+  }
+}
+
+function fetchPerfSnapshot() {
+  fetch(perfStatusUrl, { credentials:'same-origin' })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.error) return;
+    document.getElementById('ps-cpu').textContent     = d.cpu_process + '%';
+    document.getElementById('ps-cpu-sys').textContent  = d.cpu_system + '%';
+    document.getElementById('ps-ram').textContent      = d.ram_rss_mb + 'MB';
+    document.getElementById('ps-ram-sys').textContent   = d.ram_system_pct + '%';
+    document.getElementById('ps-threads').textContent   = d.threads;
+    document.getElementById('ps-pid').textContent       = d.pid;
+    document.getElementById('perf-stats').style.display = '';
+    updatePerfBadge(d.running);
+  }).catch(function(){});
+}
+
+document.getElementById('btn-perf-toggle').addEventListener('click', function(){
+  var btn = this; btn.disabled = true;
+  var interval = parseInt(document.getElementById('perf-interval').value) || 5;
+  fetch(perfToggleUrl, {
+    method:'POST', credentials:'same-origin',
+    headers:{'X-CSRFToken':getCsrf(),'Content-Type':'application/json'},
+    body: JSON.stringify({interval: interval})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    updatePerfBadge(d.running);
+    btn.disabled = false;
+    if (d.running) fetchPerfSnapshot();
+  })
+  .catch(function(){ btn.disabled = false; });
+});
+
+// Check initial perf status
+fetchPerfSnapshot();
 </script>
 {% endblock %}

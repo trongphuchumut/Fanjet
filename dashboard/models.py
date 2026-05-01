@@ -13,10 +13,12 @@ class MQTTConfig(models.Model):
                      choices=[(0,'QoS 0'),(1,'QoS 1'),(2,'QoS 2')])
     keep_alive   = models.PositiveIntegerField('Keep Alive (giây)', default=60)
     use_tls      = models.BooleanField('Dùng TLS/SSL', default=False)
+    auto_connect = models.BooleanField('Tự kết nối khi khởi động', default=True,
+                     help_text='Tự động kết nối MQTT client khi web server khởi động')
     updated_at   = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Cấu hình MQTT'
+        verbose_name = 'Cấu hình MQTT Client'
 
     def __str__(self):
         return f'{self.broker_host}:{self.broker_port}'

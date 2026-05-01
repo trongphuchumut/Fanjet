@@ -30,7 +30,7 @@
     background:var(--bg); scroll-behavior:smooth;
   }
   
-  .log-line { border-bottom:1px solid rgba(255,255,255,0.03); padding:4px 0; word-break:break-all; display:flex; gap:10px; }
+  .log-line { border-bottom:1px solid var(--border); padding:4px 0; word-break:break-all; display:flex; gap:10px; }
   .log-line:hover { background:rgba(255,255,255,0.02); }
   
   .lvl-info   { color:var(--txt-2); }
@@ -45,7 +45,7 @@
   .auto-ref { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:var(--txt-2); }
   .ts { position:relative; width:34px; height:20px; flex-shrink:0; cursor:pointer; }
   .ts input { opacity:0; width:0; height:0; }
-  .ts-sl { position:absolute; inset:0; border-radius:99px; background:rgba(255,255,255,.08); border:1px solid var(--border-strong); transition:all .18s; }
+  .ts-sl { position:absolute; inset:0; border-radius:99px; background:var(--bg-raised); border:1px solid var(--border-strong); transition:all .18s; }
   .ts-sl::before { content:''; position:absolute; left:2px; top:50%; transform:translateY(-50%); width:12px; height:12px; background:var(--txt-2); border-radius:50%; transition:all .18s; }
   .ts input:checked + .ts-sl { background:rgba(56,189,248,.2); border-color:var(--cyan); }
   .ts input:checked + .ts-sl::before { background:var(--cyan); transform:translateX(16px) translateY(-50%); }

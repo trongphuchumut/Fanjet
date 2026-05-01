@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import FanUnitForm, MQTTConfigForm, OllamaConfigForm
 from .models import COSpeedPoint, FanTelemetry, FanUnit, MQTTConfig, OllamaConfig
-from .mqtt_service import publish_command
+from .mqtt_service import publish_command, publish_free, get_mqtt_status, reconnect_mqtt, disconnect_mqtt
 from accounts.decorators import role_required
 
 logger = logging.getLogger(__name__)
@@ -134,17 +134,8 @@ def unit_delete_view(request, unit_id):
 
 @login_required(login_url='accounts:login')
 def monitor_view(request):
-    # Get WebSocket port from BrokerConfig
-    ws_port = 9001  # default
-    try:
-        from mqtt_broker.models import BrokerConfig
-        broker_cfg, _ = BrokerConfig.objects.get_or_create(pk=1)
-        if broker_cfg.enable_websocket:
-            ws_port = broker_cfg.ws_port
-    except Exception:
-        pass
     return render(request, 'dashboard/monitor.html', {
-        'page': 'monitor', 'mqtt_config': _mqtt_cfg(), 'ws_port': ws_port,
+        'page': 'monitor', 'mqtt_config': _mqtt_cfg(),
     })
 
 
@@ -188,7 +179,12 @@ def settings_view(request):
             mqtt_form = MQTTConfigForm(request.POST, instance=mqtt_cfg)
             if mqtt_form.is_valid():
                 mqtt_form.save()
-                messages.success(request, 'Đã lưu cấu hình MQTT!')
+                # Auto reconnect sau khi đổi config
+                try:
+                    reconnect_mqtt()
+                    messages.success(request, 'Đã lưu cấu hình MQTT và kết nối lại!')
+                except Exception as exc:
+                    messages.warning(request, f'Đã lưu config nhưng lỗi reconnect: {exc}')
                 return redirect('dashboard:settings')
         elif tab == 'ollama':
             ollama_form = OllamaConfigForm(request.POST, instance=ollama_cfg)
@@ -365,3 +361,106 @@ def api_ollama_models(request):
     except Exception as exc:
         return JsonResponse({'ok': False, 'models': [], 'error': str(exc)})
     return JsonResponse({'ok': False, 'models': []})
+
+
+@login_required(login_url='accounts:login')
+def api_mqtt_log(request):
+    """Trả về các MQTT message gần đây (polling thay thế WebSocket)."""
+    try:
+        since_id = int(request.GET.get('since', 0))
+    except (ValueError, TypeError):
+        since_id = 0
+    from .mqtt_service import get_recent_messages
+    msgs = get_recent_messages(since_id)
+    return JsonResponse({'ok': True, 'messages': msgs})
+
+
+# ═══ MQTT Client API ═════════════════════════════════════════════════════════
+
+@login_required(login_url='accounts:login')
+def api_mqtt_status(request):
+    """GET – Trạng thái MQTT client connection."""
+    status = get_mqtt_status()
+    return JsonResponse({'ok': True, **status})
+
+
+@login_required(login_url='accounts:login')
+@role_required(['Admin'])
+@require_POST
+def api_mqtt_reconnect(request):
+    """POST – Reconnect MQTT client với config hiện tại."""
+    try:
+        reconnect_mqtt()
+        return JsonResponse({'ok': True, 'message': 'Đang kết nối lại…'})
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=500)
+
+
+@login_required(login_url='accounts:login')
+@role_required(['Admin'])
+@require_POST
+def api_mqtt_disconnect(request):
+    """POST – Ngắt kết nối MQTT client."""
+    try:
+        disconnect_mqtt()
+        return JsonResponse({'ok': True, 'message': 'Đã ngắt kết nối.'})
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=500)
+
+
+@login_required(login_url='accounts:login')
+@role_required(['Admin', 'Operator'])
+@require_POST
+def api_mqtt_publish(request):
+    """POST – Publish tự do đến bất kỳ topic nào.
+    Body: {"topic": "...", "payload": "...", "qos": 1}
+    """
+    try:
+        data = json.loads(request.body)
+        topic = data.get('topic', '').strip()
+        payload = data.get('payload', '').strip()
+        qos = int(data.get('qos', 1))
+
+        if not topic:
+            return JsonResponse({'ok': False, 'error': 'Topic không được để trống'}, status=400)
+        if not payload:
+            return JsonResponse({'ok': False, 'error': 'Payload không được để trống'}, status=400)
+
+        ok = publish_free(topic, payload, qos=qos)
+        if ok:
+            return JsonResponse({'ok': True, 'message': f'Đã publish đến {topic}'})
+        else:
+            return JsonResponse({'ok': False, 'error': 'Không thể publish. Kiểm tra kết nối MQTT.'}, status=500)
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+
+# ═══════════════════════════════════════════════════
+# PERFORMANCE MONITOR API
+# ═══════════════════════════════════════════════════
+
+@login_required
+@role_required('Admin')
+def api_perf_toggle(request):
+    """POST: bật/tắt performance monitor in ra terminal."""
+    from . import perf_monitor
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST only'}, status=405)
+
+    data = json.loads(request.body) if request.body else {}
+    interval = int(data.get('interval', 5))
+
+    if perf_monitor.is_running():
+        perf_monitor.stop()
+        return JsonResponse({'ok': True, 'running': False, 'message': 'PerfMon đã tắt'})
+    else:
+        perf_monitor.start(interval=interval)
+        return JsonResponse({'ok': True, 'running': True, 'message': f'PerfMon đã bật (interval={interval}s)'})
+
+
+@login_required
+@role_required('Admin')
+def api_perf_status(request):
+    """GET: lấy snapshot CPU/RAM hiện tại."""
+    from . import perf_monitor
+    return JsonResponse(perf_monitor.get_snapshot())

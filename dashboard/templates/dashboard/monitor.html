@@ -10,7 +10,7 @@
   /* Header bar */
   .mon-head {
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 12px 18px;
+    padding: 10px 18px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-surface);
     flex-shrink: 0;
@@ -22,12 +22,15 @@
   }
   .mon-conn-badge.connected    { background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.28); color: var(--green); }
   .mon-conn-badge.disconnected { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.28); color: var(--red); }
+  .mon-conn-badge.connecting   { background: rgba(251,191,36,.1); border-color: rgba(251,191,36,.28); color: var(--amber); }
+  .mon-conn-badge.error        { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.28); color: var(--red); }
   .mon-conn-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .mon-conn-badge.connected .dot { animation: pulse-g 2s ease-in-out infinite; }
+  @keyframes pulse-g { 0%,100%{opacity:1} 50%{opacity:.3} }
 
   .mon-broker { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--txt-2); }
 
-  .mon-actions { margin-left: auto; display: flex; gap: 6px; }
+  .mon-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
   .mon-btn {
     padding: 5px 12px; border-radius: 7px; border: 1px solid var(--border);
     background: none; color: var(--txt-2); font-family: inherit;
@@ -38,6 +41,18 @@
   .mon-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
   .mon-btn:hover { background: var(--bg-hover); color: var(--txt); }
   .mon-btn.active { background: var(--bg-active); color: var(--txt-active); border-color: var(--cyan-dim); }
+
+  /* Refresh indicator */
+  .refresh-badge {
+    font-size: 11px; color: var(--txt-3);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .refresh-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cyan); opacity: 0;
+    transition: opacity .15s;
+  }
+  .refresh-dot.blink { opacity: 1; }
 
   /* Filter chips */
   .filter-chips { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -50,6 +65,42 @@
   .chip.active { background: var(--bg-active); color: var(--txt-active); border-color: var(--cyan-dim); }
   .chip:hover  { background: var(--bg-hover); color: var(--txt); }
 
+  /* Telemetry summary cards */
+  .telem-bar {
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+  }
+  .telem-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    display: flex; flex-direction: column; gap: 2px;
+    min-width: 130px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .telem-card.alarm  { border-color: rgba(248,113,113,.4); }
+  .telem-card.warning { border-color: rgba(251,191,36,.4); }
+  .telem-card.offline { opacity: .5; }
+  .tcard-name { font-weight: 700; color: var(--txt); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tcard-co   { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 800; }
+  .tcard-co.alarm   { color: var(--red); }
+  .tcard-co.warning { color: var(--amber); }
+  .tcard-co.normal  { color: var(--green); }
+  .tcard-co.unknown { color: var(--txt-3); }
+  .tcard-meta { color: var(--txt-3); font-size: 11px; }
+  .tcard-strip {
+    position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+  }
+  .tcard-strip.alarm   { background: var(--red); }
+  .tcard-strip.warning { background: var(--amber); }
+  .tcard-strip.normal  { background: var(--green); }
+
   /* Message log */
   .msg-log {
     flex: 1;
@@ -60,19 +111,19 @@
   }
   .log-row {
     display: grid;
-    grid-template-columns: 80px 180px 1fr auto;
+    grid-template-columns: 75px minmax(200px, 350px) 1fr auto;
     gap: 0;
-    padding: 6px 18px;
-    border-bottom: 1px solid rgba(255,255,255,.03);
+    padding: 5px 18px;
+    border-bottom: 1px solid var(--border);
     align-items: center;
     transition: background .1s;
-    animation: fadeRow .25s ease both;
+    animation: fadeRow .2s ease both;
   }
-  @keyframes fadeRow { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  @keyframes fadeRow { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:none} }
   .log-row:hover { background: var(--bg-hover); }
 
   .log-time { color: var(--txt-3); font-size: 11px; }
-  .log-topic { color: var(--cyan); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; }
+  .log-topic { color: var(--cyan); word-break: break-all; white-space: normal; padding-right: 12px; line-height: 1.4; }
   .log-payload { color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; }
   .log-dir {
     font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;
@@ -82,14 +133,7 @@
   .log-dir.pub { background: rgba(74,222,128,.12); color: var(--green); }
   .log-dir.sys { background: rgba(251,191,36,.12); color: var(--amber); }
 
-  /* Highlight by type */
-  .sub-bar {
-    padding: 10px 18px;
-    border-top: 1px solid var(--border);
-    background: var(--bg-surface);
-    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
-    flex-wrap: wrap;
-  }
+  /* Publish bar */
   .pub-bar {
     padding: 10px 18px;
     border-top: 1px solid var(--border);
@@ -97,68 +141,46 @@
     display: flex; gap: 8px; align-items: center; flex-shrink: 0;
     flex-wrap: wrap;
   }
-  .conn-bar {
-    padding: 10px 18px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-surface);
-    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-  .input-text {
-    height: 34px; padding: 0 10px;
-    background: var(--bg);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  .pub-topic {
+    flex: 0 0 220px; height: 36px; padding: 0 10px;
+    background: var(--bg); border: 1px solid var(--border-strong);
+    border-radius: 8px; color: var(--txt);
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
     outline: none; transition: border-color .2s;
   }
-  .input-text:focus { border-color: var(--cyan); }
-  
-  .sub-topic, .pub-topic {
-    flex: 0 0 220px;
-  }
-  .pub-bar {
-    padding: 10px 18px;
-    border-top: 1px solid var(--border);
-    background: var(--bg-surface);
-    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
-  }
-  .sub-topic, .pub-topic {
-    flex: 0 0 220px;
-    height: 38px; padding: 0 10px;
-    background: var(--bg);
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
-    outline: none; transition: border-color .2s;
-  }
-  .sub-topic:focus, .pub-topic:focus { border-color: var(--cyan); }
+  .pub-topic:focus { border-color: var(--cyan); }
   .pub-payload {
-    flex: 1; height: 38px; padding: 0 10px;
-    background: var(--bg);
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    color: var(--txt); font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    flex: 1; height: 36px; padding: 0 10px;
+    background: var(--bg); border: 1px solid var(--border-strong);
+    border-radius: 8px; color: var(--txt);
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
     outline: none; transition: border-color .2s;
   }
   .pub-payload:focus { border-color: var(--green); }
-  .btn-subscribe, .btn-publish {
-    height: 38px; padding: 0 16px; border-radius: 8px; border: none;
+  .btn-publish {
+    height: 36px; padding: 0 16px; border-radius: 8px; border: none;
+    background: linear-gradient(135deg, #059669, #047857);
+    box-shadow: 0 2px 10px rgba(5,150,105,.3);
     font-family: inherit; font-size: 13px; font-weight: 700;
     cursor: pointer; display: flex; align-items: center; gap: 7px; flex-shrink: 0;
     transition: opacity .2s, transform .2s; color: #fff;
   }
-  .btn-subscribe {
-    background: linear-gradient(135deg, #0284c7, #0369a1);
-    box-shadow: 0 2px 10px rgba(2,132,199,.3);
+  .btn-publish:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-publish:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn-publish svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; }
+
+  .pub-note { font-size: 11px; color: var(--txt-3); }
+
+  /* Empty state */
+  .log-empty {
+    text-align: center; padding: 48px 24px; color: var(--txt-3);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
   }
-  .btn-publish {
-    background: linear-gradient(135deg, #059669, #047857);
-    box-shadow: 0 2px 10px rgba(5,150,105,.3);
+
+  @media (max-width: 600px) {
+    .log-row { grid-template-columns: 60px minmax(120px, 200px) 1fr auto; }
+    .pub-topic { flex: 0 0 130px; }
   }
-  .btn-subscribe:hover, .btn-publish:hover { opacity: .88; transform: translateY(-1px); }
-  .btn-subscribe svg, .btn-publish svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; }
-  @media (max-width: 600px) { .sub-topic, .pub-topic { flex: 0 0 140px; } }
 </style>
 {% endblock %}
 
@@ -167,20 +189,26 @@
 
   <!-- Header -->
   <div class="mon-head">
-    <div class="mon-conn-badge disconnected" id="conn-badge">
+    <div class="mon-conn-badge disconnected" id="poll-badge">
       <span class="dot"></span>
-      <span id="conn-status-text">Chưa kết nối</span>
+      <span id="poll-status-text">Đang khởi động…</span>
     </div>
+
+    <span class="mon-broker" id="mon-broker">{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }}</span>
 
     <div class="filter-chips">
       <button class="chip active" data-f="all">Tất cả</button>
       <button class="chip" data-f="status">/status</button>
       <button class="chip" data-f="data">/data</button>
+      <button class="chip" data-f="telemetry">/telemetry</button>
       <button class="chip" data-f="command">/command</button>
-      <button class="chip" data-f="fault">fault</button>
     </div>
 
     <div class="mon-actions">
+      <span class="refresh-badge">
+        <span class="refresh-dot" id="refresh-dot"></span>
+        Polling 1s
+      </span>
       <button class="mon-btn active" id="btn-autoscroll">
         <svg viewBox="0 0 24 24"><polyline points="7,13 12,18 17,13"/><polyline points="7,6 12,11 17,6"/></svg>
         Auto-scroll
@@ -196,219 +224,247 @@
     </div>
   </div>
 
-  <!-- Connection bar -->
-  <div class="conn-bar">
-    <input type="text" class="input-text" id="conn-host" placeholder="Broker Host (VD: broker.hivemq.com)" value="{{ mqtt_config.broker_host|default:'127.0.0.1' }}" style="flex: 1; min-width: 150px;" />
-    <input type="number" class="input-text" id="conn-port" placeholder="Port WS" value="{{ ws_port|default:9001 }}" style="width: 90px;" />
-    <input type="text" class="input-text" id="conn-user" placeholder="Username (Tùy chọn)" value="{{ mqtt_config.username|default:'' }}" style="width: 140px;" />
-    <input type="password" class="input-text" id="conn-pass" placeholder="Password (Tùy chọn)" value="{{ mqtt_config.password|default:'' }}" style="width: 140px;" />
-    <button class="btn-subscribe" id="btn-connect" style="background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 2px 10px rgba(79,70,229,.3);">
-      <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-      <span id="btn-connect-text">Kết nối</span>
-    </button>
+  <!-- Telemetry summary cards (auto-refresh mỗi 1s) -->
+  <div class="telem-bar" id="telem-bar">
+    <!-- Được điền bởi JS polling -->
+    <span style="color:var(--txt-3);font-size:12px;">Đang tải dữ liệu quạt…</span>
   </div>
 
-  <!-- Log -->
+  <!-- Message log -->
   <div class="msg-log" id="msg-log" aria-live="polite" aria-label="Nhật ký MQTT">
-    <div class="log-row" style="border-bottom:1px solid var(--border-strong);padding-top:8px;padding-bottom:8px">
+    <div class="log-row" id="log-header" style="border-bottom:1px solid var(--border-strong);padding-top:8px;padding-bottom:8px">
       <span class="log-time" style="font-weight:700;color:var(--txt-2)">Giờ</span>
       <span class="log-topic" style="font-weight:700;color:var(--txt-2)">Topic</span>
       <span class="log-payload" style="font-weight:700;color:var(--txt-2)">Payload</span>
       <span class="log-dir" style="background:none;color:var(--txt-2)">Hướng</span>
     </div>
+    <div class="log-empty" id="log-empty">Chưa có bản tin nào. Đang chờ dữ liệu từ MQTT…</div>
   </div>
 
-  <!-- Subscribe bar -->
-  <div class="sub-bar">
-    <input type="text" class="sub-topic" id="sub-topic" placeholder="Topic muốn theo dõi" value="#" />
-    <button class="btn-subscribe" id="btn-subscribe">
-      <svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-      Đăng ký (Subscribe)
-    </button>
-  </div>
-
-  <!-- Publish bar -->
+  <!-- Publish bar – publish tự do -->
   <div class="pub-bar">
-    <input type="text" class="pub-topic"   id="pub-topic"   placeholder="Topic muốn gửi" value="{{ mqtt_config.topic_prefix|default:'fanjet/basement' }}/F01/command" />
-    <input type="text" class="pub-payload" id="pub-payload" placeholder='{"cmd":"ON"}' />
+    <input type="text" class="pub-topic" id="pub-topic"
+           placeholder="Topic (bất kỳ)"
+           value="{{ mqtt_config.topic_prefix|default:'fanjet/basement' }}/U01/command" />
+    <input type="text" class="pub-payload" id="pub-payload"
+           placeholder='{"cmd":"ON","speed":80}' />
     <button class="btn-publish" id="btn-publish">
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
-      Gửi (Publish)
+      Publish
     </button>
+    <span class="pub-note" id="pub-note">Publish tự do qua MQTT client</span>
   </div>
 
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 <script>
 (function(){
   var log       = document.getElementById('msg-log');
+  var logEmpty  = document.getElementById('log-empty');
+  var logHeader = document.getElementById('log-header');
+  var telemBar  = document.getElementById('telem-bar');
   var paused    = false;
   var autoScroll= true;
   var filter    = 'all';
-  var PREFIX    = '{{ mqtt_config.topic_prefix|default:"fanjet/basement" }}';
-  
-  var brokerHost = '{{ mqtt_config.broker_host|default:"127.0.0.1" }}';
-  if (brokerHost === 'localhost' || brokerHost === '127.0.0.1') {
-    document.getElementById('conn-host').value = window.location.hostname || '127.0.0.1';
+  var lastId    = 0;        // cursor cho MQTT log polling
+  var hasMessages = false;
+  var pollTimer = null;
+
+  // Django URL tags
+  var URL_MQTT_LOG    = '{% url "dashboard:api_mqtt_log" %}';
+  var URL_TELEMETRY   = '{% url "dashboard:api_telemetry" %}';
+  var URL_MQTT_STATUS = '{% url "dashboard:api_mqtt_status" %}';
+  var URL_MQTT_PUB    = '{% url "dashboard:api_mqtt_publish" %}';
+
+  /* ── Helpers ─────────────────────────────── */
+  function escapeHTML(s) {
+    return String(s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
-  var client = null;
-  var isMqttConnected = false;
-
-  function now() {
-    return new Date().toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  function matchFilter(msg) {
+    if (filter === 'all') return true;
+    return msg.topic.includes('/' + filter);
   }
 
-  function matchFilter(row) {
-    if(filter==='all') return true;
-    if(filter==='fault') return row.fault;
-    if(filter==='status')  return row.topic.includes('/status');
-    if(filter==='data')    return row.topic.includes('/data') || row.topic.includes('/telemetry');
-    if(filter==='command') return row.topic.includes('/command');
-    return true;
+  function blinkDot() {
+    var d = document.getElementById('refresh-dot');
+    d.classList.add('blink');
+    setTimeout(function(){ d.classList.remove('blink'); }, 200);
   }
 
-  function escapeHTML(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
+  /* ── Thêm dòng log ───────────────────────── */
   function addRow(msg) {
-    if(!matchFilter(msg)) return;
-    if(paused) return;
+    if (!matchFilter(msg) || paused) return;
+    if (logEmpty) logEmpty.style.display = 'none';
+    hasMessages = true;
     var row = document.createElement('div');
-    row.className = 'log-row' + (msg.fault ? ' fault' : '');
-    var safePayload = escapeHTML(msg.payload);
-    var safeTopic = escapeHTML(msg.topic);
+    row.className = 'log-row';
     row.innerHTML =
-      '<span class="log-time">'+now()+'</span>'+
-      '<span class="log-topic" title="'+safeTopic+'">'+safeTopic+'</span>'+
-      '<span class="log-payload" title="'+safePayload+'">'+safePayload+'</span>'+
-      '<span class="log-dir '+msg.dir+'">'+msg.dir.toUpperCase()+'</span>';
+      '<span class="log-time">'    + escapeHTML(msg.time)    + '</span>' +
+      '<span class="log-topic" title="' + escapeHTML(msg.topic) + '">' + escapeHTML(msg.topic) + '</span>' +
+      '<span class="log-payload" title="' + escapeHTML(msg.payload) + '">' + escapeHTML(msg.payload) + '</span>' +
+      '<span class="log-dir ' + escapeHTML(msg.dir) + '">' + escapeHTML(msg.dir.toUpperCase()) + '</span>';
     log.appendChild(row);
-    if(autoScroll) log.scrollTop = log.scrollHeight;
+    // Giữ tối đa 500 rows để tránh DOM quá lớn
+    var rows = log.querySelectorAll('.log-row:not(#log-header)');
+    if (rows.length > 500) rows[0].remove();
+    if (autoScroll) log.scrollTop = log.scrollHeight;
   }
 
-  function onConnectionLost(responseObject) {
-    isMqttConnected = false;
-    if (responseObject.errorCode !== 0) {
-      console.error("MQTT Connection Lost: " + responseObject.errorMessage);
-      addRow({topic: "$SYS", payload: "Mất kết nối: " + responseObject.errorMessage, dir: 'sys', fault: true});
-    } else {
-      addRow({topic: "$SYS", payload: "Đã ngắt kết nối an toàn", dir: 'sys'});
+  /* ── Polling MQTT log ────────────────────── */
+  function pollMqttLog() {
+    fetch(URL_MQTT_LOG + '?since=' + lastId, {
+      credentials: 'same-origin',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.ok && data.messages && data.messages.length > 0) {
+        blinkDot();
+        data.messages.forEach(function(m) {
+          if (m.id > lastId) lastId = m.id;
+          addRow(m);
+        });
+      }
+    })
+    .catch(function(err){ console.warn('[poll-mqtt]', err); });
+  }
+
+  /* ── Polling telemetry cards ─────────────── */
+  function pollTelemetry() {
+    fetch(URL_TELEMETRY, {
+      credentials: 'same-origin',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data.units) return;
+      renderTelemCards(data.units);
+    })
+    .catch(function(err){ console.warn('[poll-telem]', err); });
+  }
+
+  /* ── Polling MQTT client status ──────────── */
+  function pollMqttStatus() {
+    fetch(URL_MQTT_STATUS, {
+      credentials: 'same-origin',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('poll-badge');
+      var txt   = document.getElementById('poll-status-text');
+      var broker = document.getElementById('mon-broker');
+
+      badge.className = 'mon-conn-badge ' + (d.status || 'disconnected');
+
+      var labels = {
+        'connected':    'MQTT Connected',
+        'disconnected': 'MQTT Disconnected',
+        'connecting':   'Đang kết nối…',
+        'error':        'Lỗi kết nối',
+      };
+      var statusLabel = labels[d.status] || d.status;
+      if (d.messages_received > 0) statusLabel += ' · ' + d.messages_received + ' msg';
+      txt.textContent = statusLabel;
+
+      if (d.broker) broker.textContent = d.broker;
+    })
+    .catch(function(){ /* ignore */ });
+  }
+
+  function renderTelemCards(units) {
+    if (!units || units.length === 0) {
+      telemBar.innerHTML = '<span style="color:var(--txt-3);font-size:12px;">Chưa có bộ quạt nào được cấu hình.</span>';
+      return;
     }
-    updateConnectionUI();
+    var html = '';
+    units.forEach(function(u) {
+      var st   = u.co_status || 'unknown';
+      var co   = (u.co_ppm !== null && u.co_ppm !== undefined) ? u.co_ppm.toFixed(1) + ' ppm' : '—';
+      var spd  = (u.speed_pct !== null && u.speed_pct !== undefined) ? u.speed_pct + '%' : '—';
+      var trip = u.is_tripped ? ' ⚠ TRIP' : '';
+      var offl = u.online ? '' : ' offline';
+      html +=
+        '<div class="telem-card ' + st + offl + '">' +
+          '<div class="tcard-strip ' + st + '"></div>' +
+          '<div class="tcard-name" title="' + escapeHTML(u.name) + '">' + escapeHTML(u.unit_id) + ' · ' + escapeHTML(u.zone) + '</div>' +
+          '<div class="tcard-co ' + st + '">' + escapeHTML(co) + '</div>' +
+          '<div class="tcard-meta">' + escapeHTML(spd) + ' · ' + (u.online ? 'Online' : 'Offline') + escapeHTML(trip) + '</div>' +
+        '</div>';
+    });
+    telemBar.innerHTML = html;
   }
 
-  function updateConnectionUI() {
-    var badge = document.getElementById('conn-badge');
-    var statusText = document.getElementById('conn-status-text');
-    var btnConnect = document.getElementById('btn-connect');
-    var btnText = document.getElementById('btn-connect-text');
-    
-    if (isMqttConnected) {
-      badge.className = 'mon-conn-badge connected';
-      statusText.innerText = 'Đã kết nối';
-      btnConnect.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
-      btnConnect.style.boxShadow = '0 2px 10px rgba(220,38,38,.3)';
-      btnText.innerText = 'Ngắt kết nối';
-      btnConnect.querySelector('svg').innerHTML = '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>';
-    } else {
-      badge.className = 'mon-conn-badge disconnected';
-      statusText.innerText = 'Chưa kết nối';
-      btnConnect.style.background = 'linear-gradient(135deg, #4f46e5, #4338ca)';
-      btnConnect.style.boxShadow = '0 2px 10px rgba(79,70,229,.3)';
-      btnText.innerText = 'Kết nối';
-      btnConnect.querySelector('svg').innerHTML = '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>';
-    }
-  }
-
-  function onMessageArrived(message) {
-    var topic = message.destinationName;
-    var payload = message.payloadString;
-    var isFault = payload.includes('"tripped": true');
-    console.log("MQTT Received:", topic, payload);
-    addRow({topic: topic, payload: payload, dir: 'sub', fault: isFault});
-  };
-
-  function toggleConnection() {
-    if (isMqttConnected) {
-      if (client) client.disconnect();
+  /* ── Publish tự do qua API ───────────────── */
+  document.getElementById('btn-publish').addEventListener('click', function(){
+    var topicEl   = document.getElementById('pub-topic');
+    var payloadEl = document.getElementById('pub-payload');
+    var noteEl    = document.getElementById('pub-note');
+    var topic   = topicEl.value.trim();
+    var payload = payloadEl.value.trim();
+    if (!topic || !payload) {
+      noteEl.style.color = 'var(--red)';
+      noteEl.innerText   = '⚠ Nhập đủ Topic và Payload trước khi gửi.';
       return;
     }
 
-    var host = document.getElementById('conn-host').value.trim();
-    var port = parseInt(document.getElementById('conn-port').value.trim()) || 9001;
-    var user = document.getElementById('conn-user').value.trim();
-    var pass = document.getElementById('conn-pass').value.trim();
+    var btn = this;
+    btn.disabled = true;
+    noteEl.style.color = 'var(--txt-3)';
+    noteEl.innerText   = 'Đang gửi…';
 
-    if (!host) {
-      alert("Vui lòng nhập Broker Host");
-      return;
-    }
-
-    var clientId = 'web-mon-' + Math.random().toString(16).substr(2, 8);
-    client = new Paho.MQTT.Client(host, port, clientId);
-    client.onConnectionLost = onConnectionLost;
-    client.onMessageArrived = onMessageArrived;
-
-    document.getElementById('conn-status-text').innerText = 'Đang kết nối...';
-
-    console.log("Connecting to MQTT via WebSocket: " + host + ":" + port);
-    var connectOptions = {
-      onSuccess: function() {
-        console.log("Connected to MQTT WebSocket!");
-        isMqttConnected = true;
-        updateConnectionUI();
-        addRow({topic: "$SYS", payload: "Kết nối thành công tới " + host + ":" + port, dir: 'sys'});
-        
-        // Subscribe to default and custom
-        var customTopic = document.getElementById('sub-topic').value.trim();
-        if(customTopic) {
-            client.subscribe(customTopic);
-            console.log("Subscribed to " + customTopic);
-            addRow({topic: "$SYS", payload: "Đã đăng ký: " + customTopic, dir: 'sys'});
-        }
+    fetch(URL_MQTT_PUB, {
+      method:      'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type':     'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRFToken':      getCsrf(),
       },
-      onFailure: function(e) {
-        console.error("MQTT Connection failed: " + e.errorMessage);
-        isMqttConnected = false;
-        updateConnectionUI();
-        addRow({topic: "$SYS", payload: "Kết nối thất bại: " + e.errorMessage, dir: 'sys', fault: true});
-        alert("Lỗi kết nối tới Broker: " + e.errorMessage);
-      },
-      timeout: 10,
-      keepAliveInterval: 30,
-    };
-    if (user) {
-      connectOptions.userName = user;
-      connectOptions.password = pass;
-    }
-    
-    // Determine if we need secure wss:// connection based on current page or standard ports
-    if (window.location.protocol === "https:" || port === 443 || port === 8084 || port === 8884) {
-       connectOptions.useSSL = true;
-    }
-    
-    try {
-        client.connect(connectOptions);
-    } catch (err) {
-        alert("Không thể khởi tạo kết nối: " + err.message);
-        document.getElementById('conn-status-text').innerText = 'Chưa kết nối';
-    }
+      body: JSON.stringify({topic: topic, payload: payload, qos: 1}),
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        noteEl.style.color = 'var(--green)';
+        noteEl.innerText   = '✓ Đã publish thành công!';
+        // Hiển thị ngay trong log
+        addRow({time: new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+                topic: topic, payload: payload, dir: 'pub'});
+      } else {
+        noteEl.style.color = 'var(--red)';
+        noteEl.innerText   = '✗ Lỗi: ' + (d.error || 'Không rõ');
+      }
+    })
+    .catch(function(err){
+      noteEl.style.color = 'var(--red)';
+      noteEl.innerText   = '✗ Lỗi mạng: ' + err.message;
+    })
+    .finally(function(){
+      btn.disabled = false;
+      setTimeout(function(){
+        noteEl.style.color = 'var(--txt-3)';
+        noteEl.innerText   = 'Publish tự do qua MQTT client';
+      }, 4000);
+    });
+  });
+
+  document.getElementById('pub-payload').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') document.getElementById('btn-publish').click();
+  });
+
+  /* ── Helper: get CSRF ────────────────────── */
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
   }
 
-  // Bind Connect button
-  document.getElementById('btn-connect').addEventListener('click', toggleConnection);
-
-  /* Filter chips */
+  /* ── Filter chips ────────────────────────── */
   document.querySelectorAll('.chip').forEach(function(c){
     c.addEventListener('click', function(){
       document.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('active'); });
@@ -417,7 +473,7 @@
     });
   });
 
-  /* Controls */
+  /* ── Controls ────────────────────────────── */
   document.getElementById('btn-pause').addEventListener('click', function(){
     paused = !paused;
     this.classList.toggle('active', paused);
@@ -432,66 +488,37 @@
   });
 
   document.getElementById('btn-clear').addEventListener('click', function(){
-    var header = log.firstChild;
+    var header = document.getElementById('log-header');
     log.innerHTML = '';
     log.appendChild(header);
+    logEmpty.style.display = '';
+    log.appendChild(logEmpty);
+    hasMessages = false;
+    lastId = 0;
   });
 
-  /* Subscribe */
-  document.getElementById('btn-subscribe').addEventListener('click', function(){
-    var topic = document.getElementById('sub-topic').value.trim();
-    if(!topic) {
-        alert("Vui lòng nhập Topic cần theo dõi.");
-        return;
-    }
-    if (isMqttConnected) {
-        client.subscribe(topic);
-        console.log("Subscribed to " + topic);
-        addRow({topic: "$SYS", payload: "Đã đăng ký nhận tin từ topic: " + topic, dir: 'sys'});
+  /* ── Start polling ───────────────────────── */
+  function startPolling() {
+    pollMqttLog();
+    pollTelemetry();
+    pollMqttStatus();
+    pollTimer = setInterval(function(){
+      pollMqttLog();
+      pollTelemetry();
+      pollMqttStatus();
+    }, 1000);
+  }
+
+  // Dừng poll khi tab ẩn để tiết kiệm tài nguyên
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) {
+      clearInterval(pollTimer);
     } else {
-        alert("Chưa kết nối đến MQTT Broker!");
+      startPolling();
     }
   });
 
-  document.getElementById('sub-topic').addEventListener('keydown', function(e){
-    if(e.key==='Enter') document.getElementById('btn-subscribe').click();
-  });
-
-  /* Publish */
-  document.getElementById('btn-publish').addEventListener('click', function(){
-    var topic   = document.getElementById('pub-topic').value.trim();
-    var payload = document.getElementById('pub-payload').value.trim();
-    if(!topic||!payload) {
-        console.warn("Topic or payload is empty.");
-        return;
-    }
-    
-    console.log("MQTT Send Button Clicked:", topic, payload);
-    
-    // Ghi log trên giao diện
-    addRow({topic:topic, payload:payload, dir:'pub'});
-    
-    // Thực sự Publish qua MQTT
-    if (isMqttConnected) {
-        try {
-            var message = new Paho.MQTT.Message(payload);
-            message.destinationName = topic;
-            client.send(message);
-            console.log("MQTT Message Sent successfully.");
-        } catch (err) {
-            console.error("Error sending MQTT message:", err);
-            alert("Lỗi khi gửi bản tin: " + err.message);
-        }
-    } else {
-        alert("Chưa kết nối đến MQTT Broker! Vui lòng chờ kết nối.");
-    }
-    
-    document.getElementById('pub-payload').value='';
-  });
-  
-  document.getElementById('pub-payload').addEventListener('keydown', function(e){
-    if(e.key==='Enter') document.getElementById('btn-publish').click();
-  });
+  startPolling();
 })();
 </script>
 {% endblock %}

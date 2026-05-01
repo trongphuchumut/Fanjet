@@ -13,7 +13,8 @@ class MQTTConfigForm(forms.ModelForm):
     class Meta:
         model  = MQTTConfig
         fields = ['broker_host', 'broker_port', 'username', 'password',
-                  'client_id', 'topic_prefix', 'qos', 'keep_alive', 'use_tls']
+                  'client_id', 'topic_prefix', 'qos', 'keep_alive', 'use_tls',
+                  'auto_connect']
         widgets = {
             'broker_host':   forms.TextInput(attrs={'placeholder': '192.168.1.100'}),
             'broker_port':   forms.NumberInput(attrs={'min': 1, 'max': 65535}),

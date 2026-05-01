@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0d1117" />
   <title>{% block title %}FanJet{% endblock %} – FanJet BMS</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231e40af'/%3E%3Cg fill='white'%3E%3Cpath d='M16 16 C14.5 12 10.5 9.5 9.5 12 C8.5 14.5 13 16 16 16Z' opacity='.85'/%3E%3Cpath d='M16 16 C14.5 12 10.5 9.5 9.5 12 C8.5 14.5 13 16 16 16Z' opacity='.85' transform='rotate(120 16 16)'/%3E%3Cpath d='M16 16 C14.5 12 10.5 9.5 9.5 12 C8.5 14.5 13 16 16 16Z' opacity='.85' transform='rotate(240 16 16)'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3C/g%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -59,6 +60,56 @@
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* ═══ LIGHT THEME ═════════════════════════════ */
+    [data-theme="light"] {
+      --bg:            #eef0f4;
+      --bg-surface:    #f8f9fb;
+      --bg-raised:     #e4e7ec;
+      --bg-hover:      rgba(0,0,0,0.035);
+      --bg-active:     rgba(14,165,233,0.08);
+
+      --border:        rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.12);
+
+      --cyan:          #0369a1;
+      --cyan-dim:      rgba(3,105,161,0.12);
+      --cyan-glow:     rgba(3,105,161,0.10);
+      --green:         #15803d;
+      --green-dim:     rgba(21,128,61,0.10);
+      --red:           #b91c1c;
+      --red-dim:       rgba(185,28,28,0.08);
+      --amber:         #b45309;
+      --amber-dim:     rgba(180,83,9,0.10);
+      --indigo:        #4f46e5;
+
+      --txt:           #1e293b;
+      --txt-2:         #475569;
+      --txt-3:         #94a3b8;
+      --txt-active:    #0c4a6e;
+    }
+    [data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); }
+    [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
+    [data-theme="light"] .sb-logo { box-shadow: 0 0 0 1px rgba(0,0,0,0.08) inset, 0 4px 14px rgba(14,165,233,0.25); }
+    [data-theme="light"] .topbar-avatar,
+    [data-theme="light"] .sb-avatar { background: linear-gradient(135deg, #0284c7, #6366f1); }
+    [data-theme="light"] .notif-dot { border-color: var(--bg-surface); }
+
+    /* Theme toggle button */
+    .btn-theme {
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; border-radius: 8px;
+      color: var(--txt-2); cursor: pointer; text-decoration: none;
+      transition: background var(--dur), color var(--dur);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-theme:hover { background: var(--bg-hover); color: var(--txt); }
+    .btn-theme svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-theme .icon-sun  { display: none; }
+    .btn-theme .icon-moon { display: block; }
+    [data-theme="light"] .btn-theme .icon-sun  { display: block; }
+    [data-theme="light"] .btn-theme .icon-moon { display: none; }
 
     /* ═══ OVERLAY ═══════════════════════════════════ */
     #overlay {
@@ -304,6 +355,9 @@
     }
   </style>
   {% block extra_head %}{% endblock %}
+  <script>
+    (function(){var t=localStorage.getItem('fj_theme');if(t)document.documentElement.dataset.theme=t;})();
+  </script>
 </head>
 <body>
 
@@ -382,10 +436,10 @@
   </nav>
 
   <div class="sb-footer">
-    <!-- MQTT status mini pill -->
-    <div class="mqtt-pill">
-      <span class="mqtt-dot {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}connected{% else %}disconnected{% endif %}"></span>
-      <span class="mqtt-pill-text">
+    <!-- MQTT status mini pill (updated by JS) -->
+    <div class="mqtt-pill" id="sb-mqtt-pill">
+      <span class="mqtt-dot disconnected" id="sb-mqtt-dot"></span>
+      <span class="mqtt-pill-text" id="sb-mqtt-text">
         {% if mqtt_config %}{{ mqtt_config.broker_host }}:{{ mqtt_config.broker_port }}{% else %}Chưa cấu hình{% endif %}
       </span>
     </div>
@@ -414,13 +468,17 @@
 
     <span class="topbar-title">{% block page_title %}FanJet BMS{% endblock %}</span>
 
-    <!-- MQTT status chip -->
-    <div class="topbar-mqtt {% if mqtt_config and mqtt_config.broker_host != 'localhost' %}ok{% else %}err{% endif %}" id="topbar-mqtt-chip">
+    <!-- MQTT status chip (updated by JS) -->
+    <div class="topbar-mqtt err" id="topbar-mqtt-chip">
       <span class="dot"></span>
-      <span>{% if mqtt_config and mqtt_config.broker_host != 'localhost' %}Đã kết nối{% else %}Chưa kết nối{% endif %}</span>
+      <span id="topbar-mqtt-label">Kiểm tra…</span>
     </div>
 
     <div class="topbar-actions">
+      <button class="btn-theme" id="btn-theme" aria-label="Đổi giao diện sáng/tối" title="Đổi giao diện">
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
       <a href="{% url 'dashboard:settings' %}" class="topbar-btn" aria-label="Cấu hình MQTT">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="3"/>
@@ -476,6 +534,56 @@
   ov.addEventListener('click', function(){ html.dataset.sidebar=''; });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape'&&mobile()) html.dataset.sidebar=''; });
   window.addEventListener('resize', function(){ if(!mobile()&&html.dataset.sidebar==='mobile-open') html.dataset.sidebar='expanded'; });
+})();
+
+// ── Theme toggle ──
+(function(){
+  var html = document.documentElement;
+  var KEY  = 'fj_theme';
+  var saved = localStorage.getItem(KEY);
+  if (saved) html.dataset.theme = saved;
+
+  var btn = document.getElementById('btn-theme');
+  if (btn) {
+    btn.addEventListener('click', function(){
+      var isLight = html.dataset.theme === 'light';
+      html.dataset.theme = isLight ? 'dark' : 'light';
+      localStorage.setItem(KEY, html.dataset.theme);
+    });
+  }
+})();
+
+// ── Global MQTT status polling (sidebar pill + topbar chip) ──
+(function(){
+  var statusUrl = '{% url "dashboard:api_mqtt_status" %}';
+  function updateGlobalMqtt() {
+    fetch(statusUrl, {credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      // Sidebar pill
+      var dot  = document.getElementById('sb-mqtt-dot');
+      var text = document.getElementById('sb-mqtt-text');
+      if (dot) {
+        dot.className = 'mqtt-dot ' + (d.status === 'connected' ? 'connected' : 'disconnected');
+      }
+      if (text && d.broker) {
+        text.textContent = d.broker;
+      }
+      // Topbar chip
+      var chip  = document.getElementById('topbar-mqtt-chip');
+      var label = document.getElementById('topbar-mqtt-label');
+      if (chip) {
+        chip.className = 'topbar-mqtt ' + (d.status === 'connected' ? 'ok' : 'err');
+      }
+      if (label) {
+        var labels = {'connected':'Đã kết nối','disconnected':'Chưa kết nối','connecting':'Đang kết nối…','error':'Lỗi'};
+        label.textContent = labels[d.status] || d.status;
+      }
+    })
+    .catch(function(){});
+  }
+  updateGlobalMqtt();
+  setInterval(updateGlobalMqtt, 5000);
 })();
 </script>
 {% block extra_scripts %}{% endblock %}

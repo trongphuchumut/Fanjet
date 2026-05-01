@@ -46,7 +46,7 @@
   .co-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
   .co-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--txt-3); }
   .co-val { font-size:15px; font-weight:800; letter-spacing:-.3px; }
-  .co-bar-wrap { height:6px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; }
+  .co-bar-wrap { height:6px; background:var(--bg-raised); border-radius:99px; overflow:hidden; }
   .co-bar { height:100%; border-radius:99px; transition:width .6s cubic-bezier(.4,0,.2,1); }
   .co-bar.normal  { background:linear-gradient(90deg,#0ea5e9,#38bdf8); }
   .co-bar.warning { background:linear-gradient(90deg,#d97706,#fbbf24); }
@@ -71,7 +71,7 @@
   .speed-info { text-align:center; }
   .speed-num  { font-size:24px; font-weight:800; letter-spacing:-.5px; }
   .speed-unit { font-size:11px; color:var(--txt-2); font-weight:600; }
-  .speed-bar-wrap { width:64px; height:5px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; margin:5px auto 0; }
+  .speed-bar-wrap { width:64px; height:5px; background:var(--bg-raised); border-radius:99px; overflow:hidden; margin:5px auto 0; }
   .speed-bar { height:100%; background:linear-gradient(90deg,#0ea5e9,#4ade80); border-radius:99px; transition:width .5s; }
 
   /* Trip badge */
@@ -81,7 +81,7 @@
   .trip-badge svg { width:10px; height:10px; stroke:currentColor; fill:none; stroke-width:2.5; }
 
   /* Card footer – controls */
-  .uc-foot { padding:10px 14px; border-top:1px solid var(--border); background:rgba(0,0,0,.15);
+  .uc-foot { padding:10px 14px; border-top:1px solid var(--border); background:var(--bg-hover);
              display:flex; flex-direction:column; gap:8px; }
   .mode-row { display:flex; align-items:center; gap:6px; }
   .ml { font-size:11.5px; color:var(--txt-2); flex:1; }
@@ -93,7 +93,7 @@
 
   .manual-row { display:flex; align-items:center; gap:8px; }
   .speed-slider { flex:1; -webkit-appearance:none; height:4px; border-radius:99px;
-                  background:rgba(255,255,255,.1); outline:none; cursor:pointer; }
+                  background:var(--bg-raised); outline:none; cursor:pointer; }
   .speed-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px;
     border-radius:50%; background:var(--cyan); cursor:pointer; box-shadow:0 0 0 3px var(--cyan-glow); }
   .speed-display { font-size:12px; font-weight:700; color:var(--cyan); width:36px; text-align:right; flex-shrink:0; }

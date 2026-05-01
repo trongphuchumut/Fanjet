@@ -8,7 +8,7 @@
   .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
   @media(max-width:800px){ .detail-grid{ grid-template-columns:1fr; } }
   .d-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-  .d-head { padding:14px 18px; border-bottom:1px solid var(--border); background:rgba(0,0,0,.12);
+  .d-head { padding:14px 18px; border-bottom:1px solid var(--border); background:var(--bg-hover);
             display:flex; align-items:center; gap:10px; }
   .d-icon { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .d-icon svg { width:14px; height:14px; stroke:#fff; fill:none; stroke-width:2; }
@@ -26,7 +26,7 @@
   .profile-table { width:100%; border-collapse:collapse; }
   .profile-table th { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
                        color:var(--txt-3); padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
-  .profile-table td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.04); }
+  .profile-table td { padding:7px 10px; border-bottom:1px solid var(--border); }
   .profile-table tr:last-child td { border-bottom:none; }
   .pt-input { width:80px; height:34px; padding:0 8px; background:var(--bg); border:1px solid var(--border-strong);
               border-radius:7px; color:var(--txt); font-family:'JetBrains Mono',monospace; font-size:13px;
@@ -43,13 +43,13 @@
   .chart-line { stroke:var(--cyan); stroke-width:2; fill:none; }
   .chart-area { fill:rgba(56,189,248,.08); }
   .chart-dot  { fill:var(--cyan); }
-  .chart-grid { stroke:rgba(255,255,255,.05); stroke-width:1; }
-  .chart-axis { stroke:rgba(255,255,255,.12); stroke-width:1; }
+  .chart-grid { stroke:var(--border); stroke-width:1; }
+  .chart-axis { stroke:var(--border-strong); stroke-width:1; }
   .chart-lbl  { font-size:10px; fill:var(--txt-3); font-family:'JetBrains Mono',monospace; }
 
   /* Manual control */
   .spd-slider { width:100%; -webkit-appearance:none; height:6px; border-radius:99px;
-                background:rgba(255,255,255,.1); outline:none; cursor:pointer; }
+                background:var(--bg-raised); outline:none; cursor:pointer; }
   .spd-slider::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px;
     border-radius:50%; background:var(--cyan); cursor:pointer; box-shadow:0 0 0 4px var(--cyan-glow); }
   .speed-val-big { font-size:36px; font-weight:900; letter-spacing:-1px; }
