@@ -125,6 +125,11 @@ def _on_message(client, userdata, msg):
         is_tripped = bool(payload.get('tripped', False))
         mode       = str(payload.get('mode', 'auto'))
 
+        # Gateway 4G signal info (optional fields from ESP32)
+        rssi       = payload.get('rssi', None)
+        carrier    = str(payload.get('carrier', ''))
+        signal_lbl = str(payload.get('signal', ''))
+
         # Lazy imports to avoid circular import at module load time
         from django.utils import timezone
         from .models import FanUnit, FanTelemetry
@@ -144,19 +149,31 @@ def _on_message(client, userdata, msg):
             mode=mode,
         )
 
-        # Update cached "last" fields
-        FanUnit.objects.filter(pk=unit.pk).update(
-            last_co_ppm=co_ppm,
-            last_speed_pct=speed_pct,
-            last_tripped=is_tripped,
-            last_seen=timezone.now(),
-        )
+        # Update cached "last" fields (including gateway signal)
+        update_fields = {
+            'last_co_ppm': co_ppm,
+            'last_speed_pct': speed_pct,
+            'last_tripped': is_tripped,
+            'last_seen': timezone.now(),
+        }
+        if rssi is not None:
+            try:
+                update_fields['last_rssi'] = int(rssi)
+            except (ValueError, TypeError):
+                pass
+        if carrier:
+            update_fields['last_carrier'] = carrier[:50]
+        if signal_lbl:
+            update_fields['last_signal'] = signal_lbl[:20]
+
+        FanUnit.objects.filter(pk=unit.pk).update(**update_fields)
 
         # Increment message counter
         with _state_lock:
             _mqtt_state['messages_received'] += 1
 
-        logger.debug(f'[MQTT Client] {unit_id}: co={co_ppm} speed={speed_pct}% trip={is_tripped}')
+        sig_info = f' sig={signal_lbl}({rssi}dBm)' if rssi else ''
+        logger.debug(f'[MQTT Client] {unit_id}: co={co_ppm} speed={speed_pct}% trip={is_tripped}{sig_info}')
 
     except Exception as exc:
         logger.error(f'[MQTT Client] on_message error: {exc}')

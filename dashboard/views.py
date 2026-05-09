@@ -47,6 +47,10 @@ def _unit_summary(unit):
         'co_status':    status,
         'co_warn_ppm':  unit.co_warn_ppm,
         'co_alarm_ppm': unit.co_alarm_ppm,
+        # Gateway 4G signal
+        'rssi':         unit.last_rssi,
+        'carrier':      unit.last_carrier or '',
+        'signal':       unit.last_signal or '',
     }
 
 

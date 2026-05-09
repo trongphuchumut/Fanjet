@@ -68,6 +68,13 @@ class FanUnit(models.Model):
     last_tripped   = models.BooleanField(default=False)
     last_seen      = models.DateTimeField(null=True, blank=True)
 
+    # Gateway 4G signal (written by MQTT subscriber thread)
+    last_rssi      = models.IntegerField('RSSI (dBm)', null=True, blank=True,
+                       help_text='Cường độ tín hiệu 4G gateway (dBm)')
+    last_carrier   = models.CharField('Nhà mạng', max_length=50, blank=True, default='')
+    last_signal    = models.CharField('Chất lượng sóng', max_length=20, blank=True, default='',
+                       help_text='excellent/good/fair/weak/critical/unknown')
+
     is_active  = models.BooleanField('Kích hoạt', default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
