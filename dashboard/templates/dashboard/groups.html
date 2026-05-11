@@ -1,0 +1,378 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Nhóm quạt{% endblock %}
+{% block page_title %}Nhóm quạt – Trip Compensation{% endblock %}
+
+{% block extra_head %}
+<style>
+  .grp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+
+  .grp-card {
+    background:var(--bg-surface); border:1px solid var(--border);
+    border-radius:14px; overflow:hidden;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .grp-card:hover { border-color:var(--cyan-dim); box-shadow:0 0 0 1px var(--cyan-dim); }
+
+  .grp-head {
+    padding:14px 16px; display:flex; align-items:center; gap:10px;
+    border-bottom:1px solid var(--border); background:var(--bg-hover);
+  }
+  .grp-icon {
+    width:34px; height:34px; border-radius:9px; flex-shrink:0;
+    background:linear-gradient(135deg,rgba(56,189,248,.25),rgba(129,140,248,.25));
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+  }
+  .grp-name { font-size:14px; font-weight:700; flex:1; }
+  .grp-badge {
+    padding:2px 9px; border-radius:99px; font-size:11px; font-weight:700;
+  }
+  .grp-badge.active { background:var(--green-dim); color:var(--green); }
+  .grp-badge.inactive { background:var(--red-dim); color:var(--red); }
+
+  .grp-body { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+
+  .grp-stat-row { display:flex; gap:8px; }
+  .grp-stat {
+    flex:1; background:var(--bg-raised); border:1px solid var(--border);
+    border-radius:9px; padding:9px 12px;
+  }
+  .grp-stat-val { font-size:18px; font-weight:800; letter-spacing:-.3px; }
+  .grp-stat-lbl { font-size:10.5px; color:var(--txt-2); font-weight:600; text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
+
+  .grp-trip-info {
+    background:rgba(248,113,113,.07); border:1px solid rgba(248,113,113,.2);
+    border-radius:9px; padding:9px 12px; font-size:12.5px;
+  }
+  .grp-trip-info.ok { background:var(--green-dim); border-color:rgba(74,222,128,.3); }
+
+  .grp-units { display:flex; flex-wrap:wrap; gap:6px; }
+  .unit-chip {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 10px; border-radius:99px; font-size:11.5px; font-weight:600;
+    border:1px solid var(--border); background:var(--bg-raised);
+  }
+  .unit-chip .dot { width:6px; height:6px; border-radius:50%; }
+  .unit-chip .dot.tripped { background:var(--red); }
+  .unit-chip .dot.ok { background:var(--green); }
+  .unit-chip .dot.off { background:var(--txt-3); }
+
+  .grp-actions { display:flex; gap:8px; margin-top:4px; }
+  .btn-sm {
+    flex:1; padding:7px 0; border-radius:8px; font-size:12.5px; font-weight:700;
+    text-align:center; text-decoration:none; cursor:pointer;
+    border:1px solid var(--border); background:var(--bg-raised);
+    color:var(--txt-2); transition:all .15s;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-sm:hover { background:var(--bg-hover); color:var(--txt); border-color:var(--border-strong); }
+  .btn-sm.danger { color:var(--red); border-color:rgba(248,113,113,.25); }
+  .btn-sm.danger:hover { background:var(--red-dim); border-color:rgba(248,113,113,.5); }
+  .btn-sm.primary { background:linear-gradient(135deg,#0ea5e9,#0284c7); border-color:transparent; color:#fff; }
+  .btn-sm.primary:hover { filter:brightness(1.1); }
+
+  /* Modal */
+  .modal-backdrop {
+    display:none; position:fixed; inset:0; z-index:200;
+    background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+    align-items:center; justify-content:center;
+  }
+  .modal-backdrop.show { display:flex; }
+  .modal {
+    background:var(--bg-surface); border:1px solid var(--border-strong);
+    border-radius:16px; padding:24px; width:min(560px,95vw);
+    max-height:90vh; overflow-y:auto;
+    box-shadow:0 24px 60px rgba(0,0,0,.5);
+  }
+  .modal-title { font-size:16px; font-weight:800; margin-bottom:16px; }
+  .form-row { margin-bottom:14px; }
+  .form-row label { display:block; font-size:12px; font-weight:700; color:var(--txt-2); text-transform:uppercase; letter-spacing:.35px; margin-bottom:5px; }
+  .form-row input, .form-row select, .form-row textarea {
+    width:100%; padding:9px 12px; border-radius:9px; font-size:13.5px; font-family:inherit;
+    background:var(--bg-raised); border:1px solid var(--border-strong); color:var(--txt);
+    transition:border-color .15s;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline:none; border-color:var(--cyan-dim); box-shadow:0 0 0 3px rgba(56,189,248,.1);
+  }
+  .form-help { font-size:11px; color:var(--txt-3); margin-top:3px; }
+
+  .units-check-grid { display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }
+  .unit-check {
+    display:flex; align-items:center; gap:9px; padding:8px 10px;
+    border-radius:8px; border:1px solid var(--border); cursor:pointer;
+    transition:background .12s;
+  }
+  .unit-check:hover { background:var(--bg-hover); }
+  .unit-check input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--cyan); }
+  .unit-check-info { flex:1; }
+  .unit-check-name { font-size:13px; font-weight:600; }
+  .unit-check-sub { font-size:11px; color:var(--txt-3); }
+
+  .modal-actions { display:flex; gap:8px; margin-top:18px; }
+  .btn-modal {
+    flex:1; padding:10px; border-radius:9px; font-size:13.5px; font-weight:700;
+    border:none; cursor:pointer; font-family:inherit; transition:all .15s;
+  }
+  .btn-modal.cancel { background:var(--bg-raised); color:var(--txt-2); }
+  .btn-modal.cancel:hover { background:var(--bg-hover); color:var(--txt); }
+  .btn-modal.save { background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; }
+  .btn-modal.save:hover { filter:brightness(1.12); }
+
+  .empty-card {
+    background:var(--bg-surface); border:1px dashed var(--border-strong);
+    border-radius:14px; padding:60px 20px; text-align:center;
+    grid-column:1/-1;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px;">
+  <div>
+    <div style="font-size:13px; color:var(--txt-2); margin-top:2px;">
+      Khi quạt trong nhóm bị trip, các quạt còn lại sẽ tự động tăng công suất bù.
+    </div>
+  </div>
+  {% if request.user|has_role:'Admin' %}
+  <button class="btn-sm primary" style="flex:none; padding:9px 18px;" onclick="openCreateModal()" id="btn-create-group">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Tạo nhóm mới
+  </button>
+  {% endif %}
+</div>
+
+{% if groups %}
+<div class="grp-grid">
+  {% for grp in groups %}
+  <div class="grp-card" id="grp-{{ grp.id }}">
+    <div class="grp-head">
+      <div class="grp-icon">🔗</div>
+      <div class="grp-name">{{ grp.name }}</div>
+      <span class="grp-badge {% if grp.is_active %}active{% else %}inactive{% endif %}">
+        {% if grp.is_active %}Hoạt động{% else %}Tắt{% endif %}
+      </span>
+    </div>
+    <div class="grp-body">
+
+      {% if grp.description %}
+      <div style="font-size:12.5px; color:var(--txt-2);">{{ grp.description }}</div>
+      {% endif %}
+
+      <div class="grp-stat-row">
+        <div class="grp-stat">
+          <div class="grp-stat-val" style="color:var(--cyan);">{{ grp.boost_per_trip_pct }}%</div>
+          <div class="grp-stat-lbl">Boost/trip</div>
+        </div>
+        <div class="grp-stat">
+          <div class="grp-stat-val" style="color:var(--amber);">{{ grp.max_speed_pct }}%</div>
+          <div class="grp-stat-lbl">Tốc độ tối đa</div>
+        </div>
+        <div class="grp-stat">
+          <div class="grp-stat-val">{{ grp.unit_list|length }}</div>
+          <div class="grp-stat-lbl">Số quạt</div>
+        </div>
+      </div>
+
+      {% if grp.tripped_units %}
+      <div class="grp-trip-info">
+        ⚠️ <strong>{{ grp.tripped_units|length }} quạt đang trip</strong>
+        → Boost +{{ grp.boost_pct_now }}% cho {{ grp.active_units_count }} quạt còn lại
+      </div>
+      {% else %}
+      <div class="grp-trip-info ok">
+        ✅ Không có quạt trip – hệ thống bình thường
+      </div>
+      {% endif %}
+
+      <div>
+        <div style="font-size:11px; font-weight:700; color:var(--txt-3); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px;">Danh sách quạt</div>
+        <div class="grp-units">
+          {% for u in grp.unit_list %}
+          <span class="unit-chip">
+            <span class="dot {% if u.last_tripped %}tripped{% elif u.is_online %}ok{% else %}off{% endif %}"></span>
+            {{ u.name }}
+          </span>
+          {% empty %}
+          <span style="font-size:12px; color:var(--txt-3);">Chưa có quạt nào</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if request.user|has_role:'Admin' %}
+      <div class="grp-actions">
+        <button class="btn-sm" onclick="openEditModal({{ grp.id }}, '{{ grp.name|escapejs }}', '{{ grp.description|escapejs }}', {{ grp.boost_per_trip_pct }}, {{ grp.max_speed_pct }}, {{ grp.is_active|yesno:'true,false' }}, [{% for u in grp.unit_list %}'{{ u.unit_id }}'{% if not forloop.last %},{% endif %}{% endfor %}])">
+          ✏️ Sửa
+        </button>
+        <button class="btn-sm danger" onclick="deleteGroup({{ grp.id }}, '{{ grp.name|escapejs }}')">
+          🗑 Xóa
+        </button>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-card">
+  <div style="font-size:44px; margin-bottom:10px;">🔗</div>
+  <div style="font-size:15px; font-weight:700; margin-bottom:6px;">Chưa có nhóm quạt nào</div>
+  <div style="color:var(--txt-2); margin-bottom:18px;">Tạo nhóm để bật tính năng bù công suất tự động khi quạt trip.</div>
+  {% if request.user|has_role:'Admin' %}
+  <button class="btn-sm primary" style="max-width:200px; margin:0 auto; padding:10px 20px;" onclick="openCreateModal()">
+    + Tạo nhóm đầu tiên
+  </button>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ═══ CREATE / EDIT MODAL ═══ -->
+{% if request.user|has_role:'Admin' %}
+<div class="modal-backdrop" id="grp-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Tạo nhóm quạt</div>
+
+    <div class="form-row">
+      <label for="grp-name">Tên nhóm *</label>
+      <input type="text" id="grp-name" placeholder="Ví dụ: Tầng hầm B1" maxlength="100" />
+    </div>
+    <div class="form-row">
+      <label for="grp-desc">Mô tả</label>
+      <textarea id="grp-desc" rows="2" placeholder="Mô tả ngắn (tuỳ chọn)"></textarea>
+    </div>
+    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div>
+        <label for="grp-boost">Boost mỗi trip (%)</label>
+        <input type="number" id="grp-boost" min="1" max="100" value="10" />
+        <div class="form-help">Mỗi 1 quạt trip → quạt còn lại tăng thêm X%</div>
+      </div>
+      <div>
+        <label for="grp-maxspd">Tốc độ tối đa (%)</label>
+        <input type="number" id="grp-maxspd" min="20" max="100" value="100" />
+        <div class="form-help">Giới hạn tốc độ khi boost</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>
+        <input type="checkbox" id="grp-active" checked style="margin-right:6px; accent-color:var(--cyan);" />
+        Kích hoạt nhóm này
+      </label>
+    </div>
+    <div class="form-row">
+      <label>Chọn quạt trong nhóm</label>
+      <div class="units-check-grid" id="units-check-list">
+        {% for u in all_units %}
+        <label class="unit-check">
+          <input type="checkbox" name="unit_ids" value="{{ u.unit_id }}" />
+          <div class="unit-check-info">
+            <div class="unit-check-name">{{ u.name }}</div>
+            <div class="unit-check-sub">{{ u.unit_id }} · {{ u.zone }}</div>
+          </div>
+          {% if u.last_tripped %}<span style="font-size:11px;color:var(--red);font-weight:700;">TRIP</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-modal cancel" id="modal-cancel" onclick="closeModal()">Hủy</button>
+      <button class="btn-modal save" id="modal-save" onclick="saveGroup()">Lưu nhóm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var CSRF = document.querySelector('meta[name=csrf-token]').content;
+var editingId = null;
+
+function openCreateModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Tạo nhóm quạt';
+  document.getElementById('grp-name').value = '';
+  document.getElementById('grp-desc').value = '';
+  document.getElementById('grp-boost').value = 10;
+  document.getElementById('grp-maxspd').value = 100;
+  document.getElementById('grp-active').checked = true;
+  document.querySelectorAll('#units-check-list input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  document.getElementById('grp-modal').classList.add('show');
+}
+
+function openEditModal(id, name, desc, boost, maxspd, active, unitIds) {
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Sửa nhóm quạt';
+  document.getElementById('grp-name').value = name;
+  document.getElementById('grp-desc').value = desc;
+  document.getElementById('grp-boost').value = boost;
+  document.getElementById('grp-maxspd').value = maxspd;
+  document.getElementById('grp-active').checked = active;
+  document.querySelectorAll('#units-check-list input[type=checkbox]').forEach(function(cb){
+    cb.checked = unitIds.indexOf(cb.value) !== -1;
+  });
+  document.getElementById('grp-modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('grp-modal').classList.remove('show');
+  editingId = null;
+}
+
+function saveGroup() {
+  var name  = document.getElementById('grp-name').value.trim();
+  if (!name) { alert('Vui lòng nhập tên nhóm!'); return; }
+  var unitIds = [];
+  document.querySelectorAll('#units-check-list input[type=checkbox]:checked').forEach(function(cb){ unitIds.push(cb.value); });
+  var body = {
+    name:   name,
+    description: document.getElementById('grp-desc').value.trim(),
+    boost_per_trip_pct: parseInt(document.getElementById('grp-boost').value) || 10,
+    max_speed_pct:      parseInt(document.getElementById('grp-maxspd').value) || 100,
+    is_active: document.getElementById('grp-active').checked,
+    unit_ids:  unitIds,
+  };
+  var url = editingId ? '/dashboard/api/groups/' + editingId + '/' : '/dashboard/api/groups/';
+  var method = editingId ? 'PUT' : 'POST';
+  document.getElementById('modal-save').disabled = true;
+  document.getElementById('modal-save').textContent = 'Đang lưu…';
+  fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify(body),
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      closeModal();
+      location.reload();
+    } else {
+      alert('Lỗi: ' + (d.error || 'Không thể lưu'));
+      document.getElementById('modal-save').disabled = false;
+      document.getElementById('modal-save').textContent = 'Lưu nhóm';
+    }
+  })
+  .catch(function(e){ alert('Lỗi mạng: ' + e); document.getElementById('modal-save').disabled = false; document.getElementById('modal-save').textContent = 'Lưu nhóm'; });
+}
+
+function deleteGroup(id, name) {
+  if (!confirm('Xóa nhóm "' + name + '"? Hành động này không thể hoàn tác.')) return;
+  fetch('/dashboard/api/groups/' + id + '/', {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': CSRF },
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) { document.getElementById('grp-' + id).remove(); }
+    else { alert('Lỗi: ' + (d.error || 'Không thể xóa')); }
+  });
+}
+
+// Close modal on backdrop click
+document.getElementById('grp-modal').addEventListener('click', function(e){
+  if (e.target === this) closeModal();
+});
+</script>
+{% endif %}
+
+{% endblock %}

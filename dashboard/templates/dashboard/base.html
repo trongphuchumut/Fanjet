@@ -399,6 +399,11 @@
       <span class="sb-label">Bộ quạt</span>
     </a>
 
+    <a href="{% url 'dashboard:groups' %}" class="sb-link {% if page == 'groups' %}active{% endif %}" data-tip="Nhóm quạt" id="nav-groups">
+      <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><circle cx="18" cy="7" r="2"/><path d="M21 21v-1.5a3.5 3.5 0 0 0-2-3.17"/></svg>
+      <span class="sb-label">Nhóm quạt</span>
+    </a>
+
     <a href="{% url 'dashboard:monitor' %}" class="sb-link {% if page == 'monitor' %}active{% endif %}" data-tip="Giám sát MQTT" id="nav-monitor">
       <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
       <span class="sb-label">Giám sát MQTT</span>

@@ -168,7 +168,13 @@ def _on_message(client, userdata, msg):
 
         FanUnit.objects.filter(pk=unit.pk).update(**update_fields)
 
+        # ── Trip-group compensation ───────────────────────────────────────────
+        # Reload unit từ DB để có giá trị mới nhất (sau update trên)
+        unit.refresh_from_db()
+        _apply_group_trip_compensation(unit)
+
         # Increment message counter
+
         with _state_lock:
             _mqtt_state['messages_received'] += 1
 
@@ -183,6 +189,69 @@ def _on_message(client, userdata, msg):
             _push_log(msg.topic, msg.payload.decode('utf-8', errors='replace'), 'sub')
         except Exception:
             pass
+
+
+
+# ── Trip-group compensation ───────────────────────────────────────────────────
+
+# Cache trạng thái trip trước đó {unit_id: bool} để phát hiện edge thay đổi
+_trip_state_cache: dict = {}
+_trip_cache_lock = threading.Lock()
+
+
+def _apply_group_trip_compensation(unit):
+    """
+    Gọi sau khi update telemetry của `unit`.
+    Nếu unit thuộc FanGroup nào đó và trạng thái trip thay đổi (edge),
+    tính compensation speed và publish lệnh MQTT đến các quạt còn lại.
+    """
+    try:
+        from .models import FanGroup, MQTTConfig
+
+        unit_id = unit.unit_id
+        current_tripped = unit.last_tripped
+
+        # Kiểm tra edge (chỉ xử lý khi trạng thái THAY ĐỔI)
+        with _trip_cache_lock:
+            prev_tripped = _trip_state_cache.get(unit_id)
+            _trip_state_cache[unit_id] = current_tripped
+
+        if prev_tripped == current_tripped:
+            return  # không thay đổi → bỏ qua
+
+        # Lấy tất cả group chứa unit này
+        groups = FanGroup.objects.filter(units=unit, is_active=True).prefetch_related('units')
+        if not groups.exists():
+            return
+
+        cfg, _ = MQTTConfig.objects.get_or_create(pk=1)
+        edge = 'TRIP↑' if current_tripped else 'TRIP↓'
+        logger.info(f'[GroupComp] {unit_id} {edge} – kiểm tra {groups.count()} nhóm')
+
+        for group in groups:
+            compensation = group.get_trip_compensation()
+
+            if not compensation:
+                # Trip đã hết → khôi phục trạng thái: gửi lệnh không kèm override
+                # (Quạt sẽ tự điều chỉnh theo CO ở chế độ auto, chỉ cần thông báo)
+                logger.info(f'[GroupComp] Nhóm "{group.name}": không còn trip, bỏ override.')
+                continue
+
+            for target_uid, target_speed in compensation.items():
+                topic = f'{cfg.topic_prefix}/{target_uid}/command'
+                payload = {
+                    'mode':  'auto',
+                    'speed': target_speed,
+                    'group_boost': True,      # flag để PLC/ESP32 biết đây là lệnh bù group
+                    'reason': f'trip_compensation:{unit_id}',
+                }
+                publish_command(cfg, topic, payload)
+                logger.info(
+                    f'[GroupComp] Nhóm "{group.name}": gửi boost {target_uid} → {target_speed}%'
+                )
+
+    except Exception as exc:
+        logger.error(f'[GroupComp] Lỗi compensation: {exc}')
 
 
 # ── Public API ───────────────────────────────────────────────────────────────

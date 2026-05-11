@@ -207,7 +207,11 @@ function updatePills(pts) {
   }
   var coArr  = pts.map(function(p){ return p.co; });
   var spdArr = pts.map(function(p){ return p.speed; });
-  var trips  = pts.filter(function(p){ return p.tripped; }).length;
+  // Đếm số LẦN trip (rising edge: false→true), không phải số bản tin có trip
+  var trips = 0;
+  for (var i = 0; i < pts.length; i++) {
+    if (pts[i].tripped && (i === 0 || !pts[i-1].tripped)) trips++;
+  }
   var avgCO  = coArr.reduce(function(a,b){ return a+b; }, 0) / coArr.length;
   var maxCO  = Math.max.apply(null, coArr);
   var avgSpd = spdArr.reduce(function(a,b){ return a+b; }, 0) / spdArr.length;

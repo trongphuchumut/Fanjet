@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import FanUnitForm, MQTTConfigForm, OllamaConfigForm
-from .models import COSpeedPoint, FanTelemetry, FanUnit, MQTTConfig, OllamaConfig
+from .models import COSpeedPoint, FanTelemetry, FanUnit, FanGroup, MQTTConfig, OllamaConfig
 from .mqtt_service import publish_command, publish_free, get_mqtt_status, reconnect_mqtt, disconnect_mqtt
 from accounts.decorators import role_required
 
@@ -495,3 +495,117 @@ def api_perf_status(request):
     """GET: lấy snapshot CPU/RAM hiện tại."""
     from . import perf_monitor
     return JsonResponse(perf_monitor.get_snapshot())
+
+
+# ═══════════════════════════════════════════════════
+# FAN GROUP VIEWS
+# ═══════════════════════════════════════════════════
+
+@login_required(login_url='accounts:login')
+def groups_view(request):
+    """Trang danh sách và quản lý nhóm quạt."""
+    groups_qs = FanGroup.objects.prefetch_related('units').all()
+
+    # Bổ sung thông tin runtime vào mỗi group
+    groups = []
+    for grp in groups_qs:
+        unit_list = list(grp.units.filter(is_active=True))
+        tripped   = [u for u in unit_list if u.last_tripped]
+        active_count = len([u for u in unit_list if not u.last_tripped])
+        boost_now = len(tripped) * grp.boost_per_trip_pct
+
+        grp.unit_list        = unit_list
+        grp.tripped_units    = tripped
+        grp.active_units_count = active_count
+        grp.boost_pct_now    = boost_now
+        groups.append(grp)
+
+    return render(request, 'dashboard/groups.html', {
+        'page':        'groups',
+        'mqtt_config': _mqtt_cfg(),
+        'groups':      groups,
+        'all_units':   FanUnit.objects.filter(is_active=True).order_by('zone', 'unit_id'),
+    })
+
+
+@login_required(login_url='accounts:login')
+@role_required(['Admin'])
+def api_group_create(request):
+    """POST /dashboard/api/groups/ – Tạo nhóm quạt mới."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST only'}, status=405)
+    try:
+        data      = json.loads(request.body)
+        name      = data.get('name', '').strip()
+        if not name:
+            return JsonResponse({'ok': False, 'error': 'Tên nhóm không được trống'}, status=400)
+        if FanGroup.objects.filter(name=name).exists():
+            return JsonResponse({'ok': False, 'error': f'Tên nhóm "{name}" đã tồn tại'}, status=400)
+
+        grp = FanGroup.objects.create(
+            name               = name,
+            description        = data.get('description', '').strip(),
+            boost_per_trip_pct = int(data.get('boost_per_trip_pct', 10)),
+            max_speed_pct      = int(data.get('max_speed_pct', 100)),
+            is_active          = bool(data.get('is_active', True)),
+        )
+        unit_ids = data.get('unit_ids', [])
+        if unit_ids:
+            units = FanUnit.objects.filter(unit_id__in=unit_ids)
+            grp.units.set(units)
+
+        return JsonResponse({'ok': True, 'id': grp.id, 'name': grp.name})
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+
+@login_required(login_url='accounts:login')
+@role_required(['Admin'])
+def api_group_detail(request, group_id):
+    """GET/PUT/DELETE /dashboard/api/groups/<id>/"""
+    grp = get_object_or_404(FanGroup, pk=group_id)
+
+    if request.method == 'GET':
+        unit_list = list(grp.units.filter(is_active=True))
+        tripped   = [u.unit_id for u in unit_list if u.last_tripped]
+        active_count = len([u for u in unit_list if not u.last_tripped])
+        return JsonResponse({
+            'ok':               True,
+            'id':               grp.id,
+            'name':             grp.name,
+            'description':      grp.description,
+            'boost_per_trip_pct': grp.boost_per_trip_pct,
+            'max_speed_pct':    grp.max_speed_pct,
+            'is_active':        grp.is_active,
+            'unit_ids':         [u.unit_id for u in unit_list],
+            'tripped_unit_ids': tripped,
+            'active_count':     active_count,
+            'boost_now':        len(tripped) * grp.boost_per_trip_pct,
+        })
+
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            name = data.get('name', grp.name).strip()
+            if name != grp.name and FanGroup.objects.filter(name=name).exists():
+                return JsonResponse({'ok': False, 'error': f'Tên nhóm "{name}" đã tồn tại'}, status=400)
+            grp.name               = name
+            grp.description        = data.get('description', grp.description).strip()
+            grp.boost_per_trip_pct = int(data.get('boost_per_trip_pct', grp.boost_per_trip_pct))
+            grp.max_speed_pct      = int(data.get('max_speed_pct', grp.max_speed_pct))
+            grp.is_active          = bool(data.get('is_active', grp.is_active))
+            grp.save()
+            unit_ids = data.get('unit_ids')
+            if unit_ids is not None:
+                units = FanUnit.objects.filter(unit_id__in=unit_ids)
+                grp.units.set(units)
+            return JsonResponse({'ok': True, 'id': grp.id, 'name': grp.name})
+        except Exception as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+    elif request.method == 'DELETE':
+        grp.delete()
+        return JsonResponse({'ok': True})
+
+    return JsonResponse({'ok': False, 'error': 'Method not allowed'}, status=405)
+

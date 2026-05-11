@@ -170,3 +170,68 @@ class FanTelemetry(models.Model):
 
     def __str__(self):
         return f'{self.fan_unit.unit_id} @ {self.timestamp:%H:%M:%S}'
+
+
+class FanGroup(models.Model):
+    """
+    Nhóm quạt – khi X quạt trong nhóm bị trip, các quạt còn lại
+    sẽ tự động tăng công suất thêm X × boost_per_trip_pct (mặc định 10%).
+    """
+    name        = models.CharField('Tên nhóm', max_length=100, unique=True)
+    description = models.TextField('Mô tả', blank=True)
+    units       = models.ManyToManyField(
+        FanUnit, related_name='fan_groups', blank=True,
+        verbose_name='Danh sách quạt',
+        help_text='Chọn các quạt thuộc nhóm này.',
+    )
+    # Mỗi quạt trip → các quạt còn lại tăng thêm bao nhiêu %
+    boost_per_trip_pct = models.PositiveIntegerField(
+        'Boost mỗi lần trip (%)', default=10,
+        help_text='Mỗi 1 quạt bị trip → quạt còn lại tăng thêm X% công suất. Mặc định 10%.',
+    )
+    # Giới hạn tốc độ tối đa khi boost (để tránh vượt quá 100%)
+    max_speed_pct = models.PositiveIntegerField(
+        'Tốc độ tối đa khi boost (%)', default=100,
+        help_text='Giới hạn tốc độ tối đa khi áp dụng boost trip. Mặc định 100%.',
+    )
+    is_active   = models.BooleanField('Kích hoạt', default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Nhóm quạt'
+        verbose_name_plural = 'Danh sách nhóm quạt'
+
+    def __str__(self):
+        return self.name
+
+    def get_trip_compensation(self):
+        """
+        Trả về dict {unit_id: target_speed_pct} cho tất cả quạt đang HOẠT ĐỘNG
+        (không trip, is_active=True) trong nhóm, với tốc độ đã được bù trip.
+        Nếu không cần bù → trả về dict rỗng.
+        """
+        if not self.is_active:
+            return {}
+
+        all_units = list(self.units.filter(is_active=True))
+        if not all_units:
+            return {}
+
+        tripped_count = sum(1 for u in all_units if u.last_tripped)
+        if tripped_count == 0:
+            return {}
+
+        boost = tripped_count * self.boost_per_trip_pct   # tổng % cần tăng
+
+        result = {}
+        for u in all_units:
+            if u.last_tripped:
+                continue   # quạt đang trip → không gửi lệnh
+            if u.control_mode != 'auto':
+                continue   # quạt manual → không can thiệp
+            base_speed  = u.last_speed_pct or 0
+            new_speed   = min(base_speed + boost, self.max_speed_pct)
+            result[u.unit_id] = new_speed
+        return result

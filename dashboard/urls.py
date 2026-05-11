@@ -11,6 +11,7 @@ urlpatterns = [
     path('units/<str:unit_id>/',       views.unit_detail_view, name='unit_detail'),
     path('units/<str:unit_id>/edit/',  views.unit_edit_view,   name='unit_edit'),
     path('units/<str:unit_id>/delete/',views.unit_delete_view, name='unit_delete'),
+    path('groups/',                    views.groups_view,      name='groups'),
     path('monitor/',                   views.monitor_view,     name='monitor'),
     path('chatbot/',                   views.chatbot_view,     name='chatbot'),
     path('analytics/',                 views.analytics_view,   name='analytics'),
@@ -24,6 +25,8 @@ urlpatterns = [
     path('api/chat/',                              views.api_chat,           name='api_chat'),
     path('api/ollama/models/',                     views.api_ollama_models,  name='api_ollama_models'),
     path('api/mqtt-log/',                          views.api_mqtt_log,       name='api_mqtt_log'),
+    path('api/groups/',                            views.api_group_create,   name='api_group_create'),
+    path('api/groups/<int:group_id>/',             views.api_group_detail,   name='api_group_detail'),
 
     # ── MQTT Client API ──────────────────────────────────────────
     path('api/mqtt/status/',       views.api_mqtt_status,      name='api_mqtt_status'),
