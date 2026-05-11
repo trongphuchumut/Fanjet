@@ -31,13 +31,24 @@ class SimFanUnit:
     tripped: bool = False
     co_warn: float = 25.0
     co_alarm: float = 50.0
+    rssi: int = -75          # dBm giả lập (cường độ tín hiệu 4G)
+    carrier: str = "Viettel"  # Nhà mạng giả lập
     profile: list = field(default_factory=lambda: [
         {"co": 15, "speed": 30}, {"co": 25, "speed": 50},
         {"co": 35, "speed": 70}, {"co": 50, "speed": 100},
     ])
 
     def __post_init__(self):
-        self.co_target = self.co_ppm
+        self.co_target  = self.co_ppm
+        self.rssi_target = self.rssi
+
+    def _signal_label(self):
+        r = self.rssi
+        if r >= -70:  return "excellent"
+        if r >= -85:  return "good"
+        if r >= -95:  return "fair"
+        if r >= -105: return "weak"
+        return "critical"
 
     def tick(self):
         if self.tripped:
@@ -48,6 +59,9 @@ class SimFanUnit:
         self.co_ppm = max(0, round(self.co_ppm, 1))
         if self.mode == "auto":
             self.speed = self._auto_speed()
+        # RSSI dao động nhẹ quanh giá trị target
+        self.rssi = int(self.rssi_target + random.uniform(-3, 3))
+        self.rssi = max(-120, min(-50, self.rssi))
 
     def _auto_speed(self):
         pts = sorted(self.profile, key=lambda p: p["co"])
@@ -80,8 +94,15 @@ class SimFanUnit:
             self.co_alarm = float(d["co_alarm"])
 
     def to_dict(self):
-        return {"co": self.co_ppm, "speed": self.speed,
-                "tripped": self.tripped, "mode": self.mode}
+        return {
+            "co":      self.co_ppm,
+            "speed":   self.speed,
+            "tripped": self.tripped,
+            "mode":    self.mode,
+            "rssi":    self.rssi,
+            "carrier": self.carrier,
+            "signal":  self._signal_label(),
+        }
 
 
 # ── MQTT ──
@@ -205,9 +226,18 @@ class UnitPanel(wx.Panel):
         self.lbl_profile = wx.StaticText(box, label=prof_str)
         g1.Add(self.lbl_profile, 0, wx.ALIGN_CENTER_VERTICAL)
 
+        # RSSI row
+        g1.Add(wx.StaticText(box, label="RSSI:"), 0, wx.ALIGN_CENTER_VERTICAL)
+        self.lbl_rssi = wx.StaticText(box, label=f"{unit.rssi} dBm [good]", size=(130, -1))
+        self.lbl_rssi.SetFont(self.lbl_rssi.GetFont().Bold())
+        g1.Add(self.lbl_rssi, 0, wx.ALIGN_CENTER_VERTICAL)
+        g1.Add(wx.StaticText(box, label="Carrier:"), 0, wx.ALIGN_CENTER_VERTICAL)
+        self.lbl_carrier = wx.StaticText(box, label=unit.carrier, size=(80, -1))
+        g1.Add(self.lbl_carrier, 0, wx.ALIGN_CENTER_VERTICAL)
+
         bsizer.Add(g1, 0, wx.EXPAND | wx.ALL, 8)
 
-        # Row 2: Gauge (full width)
+        # Row 2: Speed Gauge (full width)
         g2 = wx.BoxSizer(wx.HORIZONTAL)
         g2.Add(wx.StaticText(box, label="Speed:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.gauge = wx.Gauge(box, range=100, style=wx.GA_HORIZONTAL)
@@ -237,11 +267,34 @@ class UnitPanel(wx.Panel):
 
         bsizer.Add(r3, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
+        # Row 4: RSSI slider
+        r4 = wx.BoxSizer(wx.HORIZONTAL)
+        r4.Add(wx.StaticText(box, label="RSSI giả lập (dBm):"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
+        self.rssi_sld = wx.Slider(box, value=unit.rssi, minValue=-120, maxValue=-50,
+                                  style=wx.SL_HORIZONTAL | wx.SL_VALUE_LABEL)
+        self.rssi_sld.Bind(wx.EVT_SLIDER, self._on_rssi_slider)
+        r4.Add(self.rssi_sld, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+
+        # Carrier selector
+        r4.Add(wx.StaticText(box, label="Mạng:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
+        self.carrier_choice = wx.Choice(box, choices=["Viettel", "Mobifone", "Vinaphone", "Gmobile"])
+        self.carrier_choice.SetStringSelection(unit.carrier)
+        self.carrier_choice.Bind(wx.EVT_CHOICE, self._on_carrier)
+        r4.Add(self.carrier_choice, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        bsizer.Add(r4, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
         self.SetSizer(bsizer)
 
     def _on_slider(self, e):
         self.unit.co_target = self.sld.GetValue()
         self.lbl_co_target.SetLabel(f"{self.sld.GetValue()} ppm")
+
+    def _on_rssi_slider(self, e):
+        self.unit.rssi_target = self.rssi_sld.GetValue()
+
+    def _on_carrier(self, e):
+        self.unit.carrier = self.carrier_choice.GetStringSelection()
 
     def _on_trip(self, e):
         self.unit.tripped = True
@@ -277,6 +330,20 @@ class UnitPanel(wx.Panel):
         else:
             self.lbl_trip.SetLabel("OK")
             self.lbl_trip.SetForegroundColour(wx.Colour(0, 128, 0))
+
+        # RSSI
+        sig = u._signal_label()
+        self.lbl_rssi.SetLabel(f"{u.rssi} dBm [{sig}]")
+        sig_colors = {
+            'excellent': wx.Colour(0, 180, 90),
+            'good':      wx.Colour(0, 160, 80),
+            'fair':      wx.Colour(200, 150, 0),
+            'weak':      wx.Colour(220, 80, 0),
+            'critical':  wx.RED,
+        }
+        self.lbl_rssi.SetForegroundColour(sig_colors.get(sig, wx.Colour(120, 120, 120)))
+        # Sync RSSI slider target
+        u.rssi_target = self.rssi_sld.GetValue()
 
 
 # ── Main Frame ──

@@ -30,6 +30,23 @@
   .unit-card.co-warning { border-color:rgba(251,191,36,.35); }
   .unit-card.co-normal  { border-color:rgba(56,189,248,.2); }
   .unit-card.offline    { border-color:var(--border); opacity:.7; }
+  .unit-card.disconnected { border-color:rgba(148,163,184,.5); opacity:.8; }
+
+  /* Signal badge */
+  .sig-badge { display:inline-flex; align-items:center; gap:3px; padding:2px 7px;
+               border-radius:99px; font-size:10px; font-weight:800; letter-spacing:.3px; }
+  .sig-badge.excellent { background:rgba(74,222,128,.15);  color:var(--green); }
+  .sig-badge.good      { background:rgba(74,222,128,.1);   color:var(--green); }
+  .sig-badge.fair      { background:rgba(251,191,36,.15);  color:var(--amber); }
+  .sig-badge.weak      { background:rgba(248,113,113,.12); color:var(--red); }
+  .sig-badge.critical  { background:rgba(248,113,113,.2);  color:var(--red); animation:pulse-r 1.5s ease-in-out infinite; }
+  .sig-badge.unknown   { background:var(--bg-raised); color:var(--txt-3); }
+
+  /* Disconnect badge */
+  .disc-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px;
+                border-radius:99px; font-size:10.5px; font-weight:800;
+                background:rgba(148,163,184,.15); color:var(--txt-2);
+                border:1px solid rgba(148,163,184,.25); }
 
   /* Card head */
   .uc-head { padding:12px 14px 8px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
@@ -204,6 +221,8 @@
       <div class="speed-info">
         {% if unit.last_tripped %}
         <div class="trip-badge"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> TRIP</div>
+        {% elif not online %}
+        <div class="disc-badge" id="disc-{{ unit.unit_id }}">📡 Mất kết nối</div>
         {% else %}
         <div class="speed-num" id="spd-val-{{ unit.unit_id }}">{{ unit.last_speed_pct|default:"0" }}<span style="font-size:13px;font-weight:500;color:var(--txt-2)">%</span></div>
         <div class="speed-unit">Tốc độ</div>
@@ -211,7 +230,15 @@
           <div class="speed-bar" id="spd-bar-{{ unit.unit_id }}" style="width:{{ unit.last_speed_pct|default:0 }}%"></div>
         </div>
         {% endif %}
-        {% if not online %}<div style="font-size:10px;color:var(--txt-3);margin-top:4px">● Offline</div>{% endif %}
+        {% if unit.last_rssi is not None %}
+        <div style="margin-top:5px" id="sig-wrap-{{ unit.unit_id }}">
+          <span class="sig-badge {{ unit.signal_label }}" id="sig-badge-{{ unit.unit_id }}">
+            📶 {{ unit.last_rssi }} dBm
+          </span>
+        </div>
+        {% else %}
+        <div style="margin-top:5px" id="sig-wrap-{{ unit.unit_id }}" style="display:none"></div>
+        {% endif %}
       </div>
     </div>
 
@@ -325,6 +352,7 @@ function updateCards(data) {
     var co = u.co_ppm, spd = u.speed_pct, st = u.co_status;
     var card = document.getElementById('card-'+uid);
     if(!card) return;
+
     // CO value
     var coEl = document.getElementById('co-val-'+uid);
     if(coEl) coEl.textContent = co !== null ? parseFloat(co).toFixed(1)+' ppm' : '— ppm';
@@ -349,15 +377,38 @@ function updateCards(data) {
     var wrap = document.getElementById('fanwrap-'+uid);
     var blades = document.getElementById('fanblades-'+uid);
     if(wrap && blades) {
-      var cls = u.is_tripped ? 'trip' : (spd&&spd>0 ? 'running' : 'off');
+      var cls = u.is_tripped ? 'trip' : (!u.online ? 'off' : (spd&&spd>0 ? 'running' : 'off'));
       wrap.className = 'fan-anim-wrap '+cls;
       blades.style.color = u.is_tripped ? '#f87171' : (spd&&spd>0 ? '#38bdf8' : '#475569');
       blades.style.animation = (!u.is_tripped && spd&&spd>0) ? '' : 'none';
     }
     // Card border
-    card.className = card.className.replace(/co-(alarm|warning|normal|offline)/g,'');
-    card.classList.add('co-'+st);
-    if(!u.online) card.classList.add('offline');
+    card.className = card.className.replace(/\bco-(alarm|warning|normal)\b/g,'').replace(/\boffline\b/g,'').replace(/\bdisconnected\b/g,'').trim();
+    if(!u.online) {
+      card.classList.add('disconnected');
+    } else {
+      card.classList.add('co-'+st);
+    }
+
+    // Disconnect badge
+    var discEl = document.getElementById('disc-'+uid);
+    if(discEl) {
+      discEl.style.display = (!u.online && !u.is_tripped) ? 'inline-flex' : 'none';
+      if(!u.online && u.seconds_since_seen !== null) {
+        var secs = u.seconds_since_seen;
+        var label = secs < 60 ? secs+'s' : Math.floor(secs/60)+'m '+( secs%60)+'s';
+        discEl.textContent = '📡 Mất kết nối ('+label+')';
+      }
+    }
+
+    // RSSI / Signal badge
+    var sigWrap = document.getElementById('sig-wrap-'+uid);
+    if(sigWrap && u.rssi !== null && u.rssi !== undefined) {
+      var sigCls = u.signal || 'unknown';
+      var rssiText = '📶 '+u.rssi+' dBm';
+      sigWrap.innerHTML = '<span class="sig-badge '+sigCls+'" id="sig-badge-'+uid+'">'+rssiText+'</span>';
+      sigWrap.style.display = 'block';
+    }
   });
 }
 

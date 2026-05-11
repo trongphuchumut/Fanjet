@@ -35,22 +35,25 @@ def _unit_summary(unit):
     co     = unit.last_co_ppm
     status = unit.co_status()
     return {
-        'unit_id':      unit.unit_id,
-        'name':         unit.name,
-        'zone':         unit.zone,
-        'co_ppm':       co,
-        'speed_pct':    unit.last_speed_pct,
-        'is_tripped':   unit.last_tripped,
-        'mode':         unit.control_mode,
-        'manual_speed': unit.manual_speed,
-        'online':       online,
-        'co_status':    status,
-        'co_warn_ppm':  unit.co_warn_ppm,
-        'co_alarm_ppm': unit.co_alarm_ppm,
+        'unit_id':               unit.unit_id,
+        'name':                  unit.name,
+        'zone':                  unit.zone,
+        'co_ppm':                co,
+        'speed_pct':             unit.last_speed_pct,
+        'is_tripped':            unit.last_tripped,
+        'mode':                  unit.control_mode,
+        'manual_speed':          unit.manual_speed,
+        'online':                online,
+        'co_status':             status,
+        'co_warn_ppm':           unit.co_warn_ppm,
+        'co_alarm_ppm':          unit.co_alarm_ppm,
+        'seconds_since_seen':    unit.seconds_since_seen(),
+        'msg_interval_sec':      unit.msg_interval_sec,
+        'disconnect_timeout_sec':unit.disconnect_timeout_sec,
         # Gateway 4G signal
-        'rssi':         unit.last_rssi,
-        'carrier':      unit.last_carrier or '',
-        'signal':       unit.last_signal or '',
+        'rssi':                  unit.last_rssi,
+        'carrier':               unit.last_carrier or '',
+        'signal':                unit.last_signal or unit.signal_label(),
     }
 
 
@@ -264,11 +267,35 @@ def api_profile_save(request, unit_id):
 @login_required(login_url='accounts:login')
 def api_history(request, unit_id):
     unit  = get_object_or_404(FanUnit, unit_id=unit_id)
-    hours = int(request.GET.get('hours', 24))
-    since = timezone.now() - timezone.timedelta(hours=hours)
+
+    # Support both "from/to" datetime-local and legacy "hours" param
+    from_str = request.GET.get('from', '')
+    to_str   = request.GET.get('to', '')
+
+    if from_str:
+        try:
+            since = timezone.datetime.fromisoformat(from_str)
+            if timezone.is_naive(since):
+                since = timezone.make_aware(since)
+        except (ValueError, TypeError):
+            since = timezone.now() - timezone.timedelta(hours=24)
+    else:
+        hours = int(request.GET.get('hours', 24))
+        since = timezone.now() - timezone.timedelta(hours=hours)
+
+    if to_str:
+        try:
+            until = timezone.datetime.fromisoformat(to_str)
+            if timezone.is_naive(until):
+                until = timezone.make_aware(until)
+        except (ValueError, TypeError):
+            until = timezone.now()
+    else:
+        until = timezone.now()
+
     qs = FanTelemetry.objects.filter(
-        fan_unit=unit, timestamp__gte=since
-    ).order_by('timestamp').values('timestamp', 'co_ppm', 'speed_pct', 'is_tripped', 'mode')
+        fan_unit=unit, timestamp__gte=since, timestamp__lte=until
+    ).order_by('timestamp').values('timestamp', 'co_ppm', 'speed_pct', 'is_tripped', 'mode')[:5000]
 
     data = [{
         'ts':      r['timestamp'].isoformat(),

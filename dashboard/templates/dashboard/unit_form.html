@@ -115,6 +115,25 @@
         </div>
       </div>
 
+      <hr class="section-divider" />
+      <div class="section-label">⏱ Cài đặt kết nối</div>
+      <div class="form-row">
+        <div class="field">
+          <label for="id_msg_interval_sec">Chu kỳ bản tin (giây)</label>
+          <input type="number" name="msg_interval_sec" id="id_msg_interval_sec"
+                 value="{{ form.msg_interval_sec.value|default:'30' }}" min="1" max="3600" step="1" />
+          {% if form.msg_interval_sec.errors %}<div class="err">{{ form.msg_interval_sec.errors.0 }}</div>{% endif %}
+          <span class="field-hint">Quạt gửi telemetry mỗi bao nhiêu giây. Mặc định 30s.</span>
+        </div>
+        <div class="field">
+          <label for="id_disconnect_timeout_sec" style="color:var(--red)">Timeout mất kết nối (giây)</label>
+          <input type="number" name="disconnect_timeout_sec" id="id_disconnect_timeout_sec"
+                 value="{{ form.disconnect_timeout_sec.value|default:'90' }}" min="5" max="3600" step="5" />
+          {% if form.disconnect_timeout_sec.errors %}<div class="err">{{ form.disconnect_timeout_sec.errors.0 }}</div>{% endif %}
+          <span class="field-hint">Sau bao lâu không nhận bản tin → báo mất kết nối. Mặc định 90s.</span>
+        </div>
+      </div>
+
       {% if form.non_field_errors %}
       <div style="padding:10px 14px;border-radius:8px;background:var(--red-dim);border:1px solid rgba(248,113,113,.25);color:var(--red);font-size:13px">
         {{ form.non_field_errors }}

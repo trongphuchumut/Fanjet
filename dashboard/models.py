@@ -62,6 +62,16 @@ class FanUnit(models.Model):
     co_warn_ppm  = models.FloatField('Ngưỡng cảnh báo CO (ppm)', default=25.0)
     co_alarm_ppm = models.FloatField('Ngưỡng báo động CO (ppm)', default=50.0)
 
+    # Connection timeout settings
+    msg_interval_sec     = models.PositiveIntegerField(
+        'Chu kỳ bản tin (giây)', default=30,
+        help_text='Thời gian giữa 2 bản tin MQTT của quạt (giây). Dùng để đánh giá mất kết nối.'
+    )
+    disconnect_timeout_sec = models.PositiveIntegerField(
+        'Timeout mất kết nối (giây)', default=90,
+        help_text='Nếu không nhận được bản tin sau thời gian này → coi là mất kết nối.'
+    )
+
     # Cached latest telemetry (written by MQTT subscriber thread)
     last_co_ppm    = models.FloatField(null=True, blank=True)
     last_speed_pct = models.IntegerField(null=True, blank=True)
@@ -107,7 +117,24 @@ class FanUnit(models.Model):
     def is_online(self):
         if not self.last_seen:
             return False
-        return (timezone.now() - self.last_seen).total_seconds() < 90
+        return (timezone.now() - self.last_seen).total_seconds() < self.disconnect_timeout_sec
+
+    def seconds_since_seen(self):
+        """Số giây kể từ bản tin cuối. None nếu chưa có bản tin."""
+        if not self.last_seen:
+            return None
+        return int((timezone.now() - self.last_seen).total_seconds())
+
+    def signal_label(self):
+        """Nhãn chất lượng tín hiệu dựa theo RSSI."""
+        if self.last_rssi is None:
+            return 'unknown'
+        r = self.last_rssi
+        if r >= -70:   return 'excellent'
+        if r >= -85:   return 'good'
+        if r >= -95:   return 'fair'
+        if r >= -105:  return 'weak'
+        return 'critical'
 
 
 class COSpeedPoint(models.Model):

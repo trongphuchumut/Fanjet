@@ -75,6 +75,22 @@
   .mtbtn.active { border-color:var(--cyan-dim); background:var(--bg-active); color:var(--txt-active); }
 
   .full-col { grid-column:1/-1; }
+
+  /* Signal badge */
+  .sig-badge { display:inline-flex; align-items:center; gap:3px; padding:2px 8px;
+               border-radius:99px; font-size:11px; font-weight:800; letter-spacing:.3px; }
+  .sig-badge.excellent { background:rgba(74,222,128,.15); color:var(--green); }
+  .sig-badge.good      { background:rgba(74,222,128,.1);  color:var(--green); }
+  .sig-badge.fair      { background:rgba(251,191,36,.15); color:var(--amber); }
+  .sig-badge.weak      { background:rgba(248,113,113,.12);color:var(--red); }
+  .sig-badge.critical  { background:rgba(248,113,113,.2); color:var(--red); animation:pulse-r 1.5s ease-in-out infinite; }
+  .sig-badge.unknown   { background:var(--bg-raised); color:var(--txt-3); }
+  @keyframes pulse-r { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  .disc-alert { display:flex; align-items:center; gap:8px; padding:10px 14px;
+                background:rgba(248,113,113,.08); border:1px solid rgba(248,113,113,.2);
+                border-radius:10px; font-size:13px; font-weight:600; color:var(--red); }
+
 </style>
 {% endblock %}
 
@@ -131,6 +147,34 @@
           <span class="stat-val" id="detail-trip">
             {% if unit.last_tripped %}<span style="color:var(--red)">⚠ TRIP</span>{% else %}<span style="color:var(--green)">✓ Bình thường</span>{% endif %}
           </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">📶 Tín hiệu 4G</span>
+          <span class="stat-val" id="detail-rssi">
+            {% if unit.last_rssi is not None %}
+            <span class="sig-badge {{ unit.signal_label }}">{{ unit.last_rssi }} dBm</span>
+            {% if unit.last_carrier %}<span style="font-size:11px;color:var(--txt-2);margin-left:6px">{{ unit.last_carrier }}</span>{% endif %}
+            {% else %}<span style="color:var(--txt-3)">Chưa có</span>{% endif %}
+          </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">⏱ Chu kỳ / Timeout</span>
+          <span class="stat-val" style="color:var(--txt-2);font-size:12.5px" id="detail-interval">
+            {{ unit.msg_interval_sec }}s / {{ unit.disconnect_timeout_sec }}s
+          </span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-lbl">📡 Bản tin cuối</span>
+          <span class="stat-val" id="detail-lastseen">
+            {% if unit.last_seen %}
+            <span id="detail-lastseen-val" style="{% if not unit.is_online %}color:var(--red){% else %}color:var(--green){% endif %}">
+              {{ unit.seconds_since_seen }}s trước
+            </span>
+            {% else %}<span style="color:var(--txt-3)">Chưa nhận</span>{% endif %}
+          </span>
+        </div>
+        <div id="detail-disc-alert" {% if unit.is_online %}style="display:none"{% endif %}>
+          <div class="disc-alert">📡 Quạt đã ngừng gửi bản tin — có thể mất kết nối!</div>
         </div>
         <div class="stat-row">
           <span class="stat-lbl">Ngưỡng CO warn/alarm</span>
@@ -263,45 +307,6 @@
   </div>
 
 </div>
-
-<!-- Recent telemetry (full width) -->
-{% if recent %}
-<div class="d-card full-col" style="margin-top:16px">
-  <div class="d-head">
-    <div class="d-icon" style="background:linear-gradient(135deg,#475569,#334155)">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-    </div>
-    <div><div class="d-title">Lịch sử gần nhất</div><div class="d-sub">{{ recent|length }} bản ghi mới nhất</div></div>
-  </div>
-  <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
-      <thead>
-        <tr>
-          {% for h in "Thời gian,Nồng độ CO,Tốc độ,Trạng thái,Chế độ" %}
-          {% endfor %}
-          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Thời gian</th>
-          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">CO (ppm)</th>
-          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Tốc độ</th>
-          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Trạng thái</th>
-          <th style="text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt-3);padding:9px 14px;border-bottom:1px solid var(--border)">Chế độ</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in recent %}
-        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-          <td style="padding:8px 14px;font-family:'JetBrains Mono',monospace;color:var(--txt-2)">{{ t.timestamp|date:"d/m H:i:s" }}</td>
-          <td style="padding:8px 14px;font-family:'JetBrains Mono',monospace;font-weight:600">{{ t.co_ppm|floatformat:1 }}</td>
-          <td style="padding:8px 14px;font-family:'JetBrains Mono',monospace">{{ t.speed_pct }}%</td>
-          <td style="padding:8px 14px">{% if t.is_tripped %}<span style="color:var(--red);font-weight:700">TRIP</span>{% else %}<span style="color:var(--green)">OK</span>{% endif %}</td>
-          <td style="padding:8px 14px;text-transform:uppercase;font-size:11px;font-weight:700;color:var(--txt-3)">{{ t.mode }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
-
 {% endblock %}
 
 {% block extra_scripts %}
@@ -391,12 +396,20 @@ function saveProfile() {
   fetch('/dashboard/api/units/'+UNIT_ID+'/profile/', {
     method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},
     body: JSON.stringify(pts.map(function(p){ return {co_ppm:p.co, speed_pct:p.spd}; }))
-  }).then(function(r){ return r.json(); }).then(function(d){
+  }).then(function(r){
+    if(!r.ok) throw new Error('Server trả về lỗi '+r.status);
+    return r.json();
+  }).then(function(d){
     btn.disabled = false;
     btn.textContent = 'Lưu biểu đồ';
-    fb.textContent = d.ok ? '✓ Đã lưu & gửi MQTT' : '✗ Lỗi: '+d.error;
+    fb.textContent = d.ok ? '✓ Đã lưu & gửi MQTT' : '✗ Lỗi: '+(d.error||'Không rõ');
     fb.style.color = d.ok ? 'var(--green)' : 'var(--red)';
     setTimeout(function(){ fb.textContent=''; }, 3000);
+  }).catch(function(err){
+    btn.disabled = false;
+    btn.textContent = 'Lưu biểu đồ';
+    fb.textContent = '✗ Lỗi mạng/CSRF: '+err.message;
+    fb.style.color = 'var(--red)';
   });
 }
 
@@ -420,20 +433,36 @@ function ctrlSend() {
   fetch('/dashboard/api/units/'+UNIT_ID+'/command/', {
     method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},
     body: JSON.stringify({mode:ctrlMode, speed:speed})
-  }).then(function(r){ return r.json(); }).then(function(d){
+  }).then(function(r){
+    if(!r.ok) throw new Error('Lỗi '+r.status);
+    return r.json();
+  }).then(function(d){
     btn.disabled = false; btn.textContent = 'Gửi lệnh MQTT ↗';
     fb.textContent = d.ok ? '✓ Đã gửi ('+ctrlMode+', '+speed+'%)' : '✗ Lỗi: '+d.error;
     fb.style.color = d.ok ? 'var(--green)' : 'var(--red)';
     setTimeout(function(){ fb.textContent=''; }, 3000);
+  }).catch(function(err){
+    btn.disabled = false; btn.textContent = 'Gửi lệnh MQTT ↗';
+    fb.textContent = '✗ '+err.message;
+    fb.style.color = 'var(--red)';
   });
 }
 
-function getCsrf() { var m=document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)'); return m?m[2]:''; }
+function getCsrf() {
+  var m = document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)');
+  if (m) return m[2];
+  // Fallback: try meta tag or hidden input
+  var meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) return meta.content;
+  var inp = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  if (inp) return inp.value;
+  return '';
+}
 
 // Init chart
 drawChart();
 
-// Polling status
+// Polling status + RSSI + disconnect
 setInterval(function(){
   fetch('/dashboard/api/telemetry/').then(function(r){return r.json();}).then(function(d){
     var u = d.units.find(function(x){ return x.unit_id===UNIT_ID; });
@@ -444,7 +473,26 @@ setInterval(function(){
     var trip = document.getElementById('detail-trip');
     trip.innerHTML = u.is_tripped ? '<span style="color:var(--red)">⚠ TRIP</span>' : '<span style="color:var(--green)">✓ Bình thường</span>';
     document.getElementById('online-status').textContent = u.online ? '● Online' : '○ Offline';
+    // RSSI
+    var rssiEl = document.getElementById('detail-rssi');
+    if(rssiEl && u.rssi !== null && u.rssi !== undefined) {
+      var sig = u.signal || 'unknown';
+      var carr = u.carrier ? '<span style="font-size:11px;color:var(--txt-2);margin-left:6px">'+u.carrier+'</span>' : '';
+      rssiEl.innerHTML = '<span class="sig-badge '+sig+'">'+u.rssi+' dBm</span>'+carr;
+    }
+    // Last seen
+    var lsEl = document.getElementById('detail-lastseen-val');
+    if(lsEl && u.seconds_since_seen !== null) {
+      var s = u.seconds_since_seen;
+      lsEl.textContent = (s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s') + ' trước';
+      lsEl.style.color = u.online ? 'var(--green)' : 'var(--red)';
+    }
+    // Disconnect alert
+    var da = document.getElementById('detail-disc-alert');
+    if(da) da.style.display = u.online ? 'none' : 'block';
   });
 }, 5000);
+
 </script>
 {% endblock %}
+

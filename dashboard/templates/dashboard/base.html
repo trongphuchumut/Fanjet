@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0d1117" />
+  <meta name="csrf-token" content="{{ csrf_token }}" />
   <title>{% block title %}FanJet{% endblock %} – FanJet BMS</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231e40af'/%3E%3Cg fill='white'%3E%3Cpath d='M16 16 C14.5 12 10.5 9.5 9.5 12 C8.5 14.5 13 16 16 16Z' opacity='.85'/%3E%3Cpath d='M16 16 C14.5 12 10.5 9.5 9.5 12 C8.5 14.5 13 16 16 16Z' opacity='.85' transform='rotate(120 16 16)'/%3E%3Cpath d='M16 16 C14.5 12 10.5 9.5 9.5 12 C8.5 14.5 13 16 16 16Z' opacity='.85' transform='rotate(240 16 16)'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3C/g%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -54,7 +55,7 @@
       min-height: 100vh;
       min-height: -webkit-fill-available;
       display: flex;
-      overflow: hidden;
+      overflow: hidden; /* sidebar fixed, main scrolls */
       -webkit-font-smoothing: antialiased;
     }
     ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -278,7 +279,7 @@
     #main-area {
       margin-left: var(--sidebar-w);
       flex: 1; display: flex; flex-direction: column;
-      min-height: 100vh; min-width: 0;
+      height: 100vh; min-width: 0;
       transition: margin-left var(--dur) var(--ease);
     }
     [data-sidebar="collapsed"] #main-area { margin-left: var(--sidebar-col); }

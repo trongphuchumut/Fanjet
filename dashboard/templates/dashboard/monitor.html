@@ -389,12 +389,33 @@
       var spd  = (u.speed_pct !== null && u.speed_pct !== undefined) ? u.speed_pct + '%' : '—';
       var trip = u.is_tripped ? ' ⚠ TRIP' : '';
       var offl = u.online ? '' : ' offline';
+
+      // RSSI badge
+      var rssiHtml = '';
+      if (u.rssi !== null && u.rssi !== undefined) {
+        var sigCls = u.signal || 'unknown';
+        rssiHtml = '<span style="font-size:10px;padding:1px 5px;border-radius:99px;font-weight:700;' +
+          (sigCls==='excellent'||sigCls==='good' ? 'background:rgba(74,222,128,.12);color:var(--green)' :
+           sigCls==='fair' ? 'background:rgba(251,191,36,.12);color:var(--amber)' :
+           'background:rgba(248,113,113,.12);color:var(--red)') +
+          '">📶 ' + u.rssi + ' dBm</span>';
+      }
+
+      // Disconnect info
+      var discHtml = '';
+      if (!u.online && u.seconds_since_seen !== null && u.seconds_since_seen !== undefined) {
+        var s = u.seconds_since_seen;
+        var lbl = s < 60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s';
+        discHtml = '<span style="font-size:10px;color:var(--red);font-weight:700"> · ⛔ '+lbl+'</span>';
+      }
+
       html +=
         '<div class="telem-card ' + st + offl + '">' +
           '<div class="tcard-strip ' + st + '"></div>' +
           '<div class="tcard-name" title="' + escapeHTML(u.name) + '">' + escapeHTML(u.unit_id) + ' · ' + escapeHTML(u.zone) + '</div>' +
           '<div class="tcard-co ' + st + '">' + escapeHTML(co) + '</div>' +
-          '<div class="tcard-meta">' + escapeHTML(spd) + ' · ' + (u.online ? 'Online' : 'Offline') + escapeHTML(trip) + '</div>' +
+          '<div class="tcard-meta">' + escapeHTML(spd) + ' · ' + (u.online ? 'Online' : 'Offline') + escapeHTML(trip) + discHtml + '</div>' +
+          (rssiHtml ? '<div style="margin-top:2px">' + rssiHtml + '</div>' : '') +
         '</div>';
     });
     telemBar.innerHTML = html;

@@ -40,13 +40,16 @@ class FanUnitForm(forms.ModelForm):
     class Meta:
         model  = FanUnit
         fields = ['unit_id', 'name', 'location', 'zone',
-                  'mqtt_topic_base', 'co_warn_ppm', 'co_alarm_ppm']
+                  'mqtt_topic_base', 'co_warn_ppm', 'co_alarm_ppm',
+                  'msg_interval_sec', 'disconnect_timeout_sec']
         widgets = {
-            'unit_id':         forms.TextInput(attrs={'placeholder': 'U01'}),
-            'name':            forms.TextInput(attrs={'placeholder': 'Bộ quạt 01'}),
-            'location':        forms.TextInput(attrs={'placeholder': 'Khu A – Hành lang Bắc'}),
-            'zone':            forms.TextInput(attrs={'placeholder': 'B1, Tầng trệt, Khu A...'}),
-            'mqtt_topic_base': forms.TextInput(attrs={'placeholder': 'Để trống → tự sinh từ prefix + unit_id'}),
-            'co_warn_ppm':     forms.NumberInput(attrs={'step': '0.5', 'min': '0'}),
-            'co_alarm_ppm':    forms.NumberInput(attrs={'step': '0.5', 'min': '0'}),
+            'unit_id':               forms.TextInput(attrs={'placeholder': 'U01'}),
+            'name':                  forms.TextInput(attrs={'placeholder': 'Bộ quạt 01'}),
+            'location':              forms.TextInput(attrs={'placeholder': 'Khu A – Hành lang Bắc'}),
+            'zone':                  forms.TextInput(attrs={'placeholder': 'B1, Tầng trệt, Khu A...'}),
+            'mqtt_topic_base':       forms.TextInput(attrs={'placeholder': 'Để trống → tự sinh từ prefix + unit_id'}),
+            'co_warn_ppm':           forms.NumberInput(attrs={'step': '0.5', 'min': '0'}),
+            'co_alarm_ppm':          forms.NumberInput(attrs={'step': '0.5', 'min': '0'}),
+            'msg_interval_sec':      forms.NumberInput(attrs={'min': '1', 'max': '3600', 'step': '1'}),
+            'disconnect_timeout_sec':forms.NumberInput(attrs={'min': '5', 'max': '3600', 'step': '5'}),
         }
